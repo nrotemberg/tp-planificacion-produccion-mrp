@@ -1,16 +1,38 @@
-# Guia Práctica
+# Trabajo Práctico: Sistema de Planificación de la Producción (MRP)
 
-## Tema: Template
+## Situación Hipotética
 
-### Ejercicio 1
+Imagine que ustedes son parte del equipo de desarrollo de software de **TecnoMecánica ITBA S.A.**, una empresa líder en la fabricación de maquinaria industrial a medida y componentes de alta precisión. La compañía se enorgullece de la calidad de sus productos y de su capacidad para personalizar soluciones, pero enfrenta un desafío creciente: la complejidad de su cadena de producción.
 
-Realiza una funcion que retorne la cadena `"hola_mundo"`
+Actualmente, la planificación de la producción se realiza de forma semi-manual, utilizando hojas de cálculo y reuniones extensivas. Esto genera cuellos de botella inesperados, retrasos en las entregas, errores en el cálculo de materiales y una gestión eficiente de los recursos. La dirección de TecnoMecánica ITBA S.A. ha decidido invertir en un nuevo sistema de gestión que automatice y optimice sus procesos de producción, con un enfoque particular en la **explosión de materiales (Bill of Materials - BOM)** y la **gestión de las solicitudes de fabricación**.
 
-```python
-# Este es un ejemplo de codigo python
-print(tu_funcion())
-```
-Imprime por pantalla
-```
-hola_mundo
-```
+Su misión es diseñar y desarrollar el núcleo de este sistema. Un producto terminado en TecnoMecánica ITBA S.A. puede ser una máquina completa o un sub-ensamble mayor. Cada producto terminado está definido por una estructura detallada de elementos constitutivos. Un elemento constitutivo puede ser un insumo básico (que se compra) o un artículo fabricado internamente (que, a su vez, tiene su propia lista de elementos y una secuencia de pasos de manufactura). La secuencia de pasos de manufactura de un artículo fabricado define las tareas necesarias para su producción, especificando la unidad de trabajo requerida y el tiempo estimado.
+
+El sistema debe ser capaz de procesar solicitudes de fabricación de un producto terminado, "explotando" su BOM para determinar las necesidades de elementos y generando las tareas necesarias en las unidades de trabajo. Además, es crucial poder identificar y gestionar los cuellos de botella en la producción, ya sea por falta de insumos, sobrecarga de una unidad de trabajo o escasez de colaboradores con las habilidades necesarias.
+
+La planta opera con diferentes períodos de trabajo, y cada unidad de trabajo y colaborador tiene su propia disponibilidad. El sistema debe anticipar conflictos y proponer soluciones para optimizar el flujo de trabajo, garantizando que los artículos se fabriquen a tiempo y con el costo adecuado. El diseño debe ser lo suficientemente flexible para que, en futuras etapas, se puedan incorporar nuevas funcionalidades como la gestión de mantenimiento de máquinas, seguimiento de calidad o escenarios de simulación avanzados, sin necesidad de un rediseño completo.
+
+## Requerimientos Técnicos Obligatorios
+
+El diseño de su sistema deberá reflejar una comprensión profunda de la Programación Orientada a Objetos para modelar las necesidades de TecnoMecánica ITBA S.A. de manera robusta y adaptable.
+
+## Reglas de Negocio
+
+1.  **Clasificación de Elementos**: Todo artículo que contribuye a la creación de un producto terminado es un elemento de producción. Hay elementos que se adquieren directamente, como insumos básicos, y otros que se fabrican dentro de la empresa. Los artículos fabricados internamente, ya sean sub-ensambles o el producto final en sí, tienen un proceso de manufactura definido.
+2.  **Estructura de la BOM**: Para cada artículo que se fabrica, es crucial detallar en una 'Lista de Materiales' (BOM) qué otros elementos (y en qué proporciones exactas) se necesitan para su elaboración. Estos elementos constitutivos deben ser referencias a insumos existentes o a otros artículos también gestionados por el sistema.
+3.  **Cantidades de Operación**: Las cantidades involucradas en el inventario, los requisitos de las listas de materiales y los volúmenes de las solicitudes de fabricación deben ser siempre números enteros y positivos. El sistema debe asegurar que no se registren valores que no cumplan con esta condición, alertando si se intenta ingresar una cantidad inválida.
+4.  **Procesos de Manufactura**: Cada artículo que se fabrica internamente, ya sea un sub-ensamble o el producto final, debe tener un proceso de manufactura claro, que consiste en una secuencia ordenada de tareas. Los insumos básicos no tienen un proceso de fabricación asociado; simplemente se adquieren.
+5.  **Definición de Tareas**: Cada tarea dentro de un proceso de manufactura representa un paso específico en la producción. Para cada tarea, se necesita una unidad de trabajo particular, un número determinado de colaboradores y se establece un tiempo estándar para completar la tarea por cada unidad fabricada.
+6.  **Cálculo de Costo Unitario**: El sistema debe calcular el costo unitario de cada artículo. Para los insumos básicos, este costo es un valor fijo conocido. Para los artículos fabricados, su costo unitario se determina sumando el costo de todos los elementos necesarios para su composición (según su Lista de Materiales) y el costo asociado a la ejecución de todos los pasos de su proceso de manufactura, incluyendo el uso de la unidad de trabajo y la mano de obra de los colaboradores.
+7.  **Evitar Dependencias Cíclicas**: Es fundamental que la definición de las Listas de Materiales no contenga ciclos; es decir, un artículo no puede requerirse a sí mismo, directa o indirectamente. El sistema debe prevenir y alertar si se intenta establecer una dependencia de este tipo.
+8.  **Verificación de Inventario**: Antes de dar comienzo a una solicitud de fabricación, el sistema debe confirmar que existe la cantidad necesaria de todos los elementos requeridos en el inventario. Si no se cuenta con los insumos suficientes, la producción no puede iniciarse, y el sistema debe indicarlo.
+9.  **Flujo de Solicitudes de Fabricación**: Una solicitud de fabricación pasa por distintas fases. Comienza como 'creada'. Luego, puede ser 'planificada', lo que implica reservar los recursos necesarios sin aún consumir los materiales. Finalmente, pasa a estar 'en curso' cuando se inicia la producción efectiva, los materiales son utilizados y se asigna tiempo a las unidades de trabajo y los colaboradores.
+10. **Gestión de Capacidad de Unidades de Trabajo**: Cada unidad de trabajo posee una capacidad máxima por período de operación, así como un límite en el número de colaboradores que puede albergar simultáneamente. El sistema debe asegurar que las tareas asignadas no sobrepasen estos límites, alertando si se intenta exceder la capacidad disponible.
+11. **Asignación de Colaboradores**: Los colaboradores trabajan en períodos de operación específicos y pueden ser asignados a unidades de trabajo para ejecutar tareas. Un colaborador solo puede estar realizando una tarea en una unidad de trabajo si está dentro de su período de operación asignado. El sistema es responsable de verificar la disponibilidad de cada colaborador.
+12. **Detección de Limitaciones**: El sistema debe poder examinar un conjunto de solicitudes de fabricación pendientes e identificar cuál unidad de trabajo o elemento de producción (ya sea por escasez de material o por limitaciones de capacidad) representa la principal restricción que impide completar dichas solicitudes a tiempo. Esto requerirá una simulación de la carga de trabajo y una comparación con la disponibilidad de recursos.
+
+## Notas
+- Se prohíbe el uso de la librería pandas; el objetivo es evaluar el manejo de estructuras nativas (listas, diccionarios) y la lógica de algoritmos manuales.
+- Es requisito obligatorio presentar un diagrama de flujo previo a la codificación para organizar la arquitectura lógica y prevenir fallos de diseño.
+- Cada implementación debe estar debidamente sustentada; el alumno debe ser capaz de explicar y justificar técnicamente las decisiones tomadas en el código.
+- Se recomienda el uso de la librería estándar de Python (como datetime o math) para optimizar tareas específicas y evitar la redacción innecesaria de funciones ya existentes.
