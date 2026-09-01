@@ -10,7 +10,7 @@ Este repositorio contiene el código para el nuevo sistema de planificación de 
 ## Arquitectura y Diagrama de Clases
 
 
-El sistema ha sido modelado utilizando Programación Orientada a Objetos (POO), garantizando modularidad, escalabilidad y flexibilidad. Tal como se detalla en el diagrama de arquitectura (`image_f02b0e.png`), el sistema se divide en las siguientes entidades principales:
+El sistema ha sido modelado utilizando Programación Orientada a Objetos (POO), garantizando modularidad, escalabilidad y flexibilidad. Tal como se detalla en el diagrama de arquitectura, el sistema se divide en las siguientes entidades principales:
 
 
 ### 1. Elementos de Producción y BOM
