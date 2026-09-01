@@ -88,11 +88,12 @@ class ProcesoManufactura: #Clase que representa un proceso de manufactura para u
 
 
 class TareaDefinida: #Clase que representa una tarea especifica dentro de un proceso de manufactura
-    def __init__(self, nombre, tiempo, unidad_trabajo, colaboradores_requeridos):
+    def __init__(self, nombre, tiempo, unidad_trabajo, colaboradores_requeridos, habilidades_requeridas):
         self.nombre = nombre
         self.tiempo = tiempo
         self.unidad_trabajo = unidad_trabajo
         self.colaboradores_requeridos = colaboradores_requeridos
+        self.habilidades_requeridas = habilidades_requeridas
 
     def agregar_tarea(self, proceso): #Metodo para agregar una tarea definida a un proceso de manufactura
         pass
@@ -131,12 +132,16 @@ class UnidadTrabajo: #Clase que representa una unidad de trabajo que puede ser a
 
 
 class Colaborador: #Clase que representa un colaborador que puede ser asignado a una tarea
-    def __init__(self, nombre, costo_por_hora):
+    def __init__(self, nombre, costo_por_hora, habilidades):
         self.nombre = nombre
         self.costo_por_hora = costo_por_hora
+        self.habilidades = habilidades
         self.periodos_operacion = []
 
     def verificar_disponibilidad(self): #Metodo para verificar si el colaborador está disponible para ser asignado a una tarea en curso
+        pass
+
+    def tiene_habilidad(self, habilidad): #Metodo para verificar si el colaborador tiene la habilidad requerida para la tarea
         pass
 
 
