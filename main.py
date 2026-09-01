@@ -5,7 +5,12 @@ class ElementoProduccion: #Clase base para Insumo y Producto
         self.unidad_medida = unidad_medida
         self.stock_total = stock_total
         self.stock_reservado = stock_reservado
-        self.costo = costo
+        self.set_costo(costo)
+
+    def set_costo(self, nuevo_costo):
+        if not isinstance(nuevo_costo, (int, float)) or nuevo_costo <= 0:
+            raise ValueError("El costo debe ser mayor a 0")
+        self.costo = nuevo_costo
 
     def hay_stock_suficiente(self, cantidad_requerida): #Metodo para verificar si hay stock suficiente
         pass
@@ -18,35 +23,53 @@ class Insumo(ElementoProduccion): #Subclase de ElementoProduccion, representa un
     def __init__(self, nombre, unidad_medida, stock_total, stock_reservado, costo):
         super().__init__(nombre, unidad_medida, stock_total, stock_reservado, costo)
 
-    def costo_unitario(self): #Metodo para obtener el costo unitario del insumo
-        pass
+    def get_costo(self): #Metodo para obtener el costo del insumo
+        return self.costo
 
-    def actualizar_costo(self, nuevo_costo): #Metodo para actualizar el costo del insumo
-        pass
+    def set_costo(self, nuevo_costo): #Metodo para actualizar el costo del insumo
+        if not isinstance(nuevo_costo, (int, float)) or nuevo_costo <= 0:
+            raise ValueError("El costo debe ser mayor a 0")
+        self.costo = nuevo_costo
+
+    def actualizar_costo(self, nuevo_costo):
+        self.set_costo(nuevo_costo)
 
 
 class ComponenteBOM: #Clase que representa un componente de la lista de materiales (BOM) de un producto
     def __init__(self, elemento_produccion, cantidad):
         self.elemento_produccion = elemento_produccion
-        self.cantidad = cantidad
+        self.set_cantidad(cantidad) #Se utiliza el metodo set_cantidad para validar la cantidad del componente
 
-    def validar_cantidad(self): #Metodo para validar que la cantidad del componente sea entera y positiva
+    def set_cantidad(self, nueva_cantidad): #Metodo para validar que la cantidad del componente sea entera y positiva
+        if isinstance(nueva_cantidad, int) and nueva_cantidad > 0:
+            self.cantidad = nueva_cantidad
+        else:
+            raise ValueError("La cantidad debe ser un número entero positivo")
         pass
 
 
 class Producto(ElementoProduccion): #Subclase de ElementoProduccion, representa un producto que se produce a partir de insumos y componentes
     def __init__(self, nombre, unidad_medida, stock_total, stock_reservado, costo):
-        super().__init__(nombre, unidad_medida, stock_total, stock_reservado, costo)
-        self.lista_elementos_bom = [] 
-
-    def costo_unitario(self): #Metodo para obtener el costo del producto
-        pass
+            super().__init__(nombre, unidad_medida, stock_total, stock_reservado, costo)
+            self.lista_elementos_bom = [] 
 
     def agregar_a_bom(self, componente): #Metodo para agregar un componente a la lista de elementos BOM del producto
-        pass
+        self.lista_elementos_bom.append(componente)
 
-    def detectar_ciclo(self): # Verifica que el producto no se necesite a sí mismo, directa o indirectamente, dentro de su BOM.
-        pass
+    def costo_unitario(self): #Metodo para obtener el costo del producto
+        costo_total = 0
+
+        for componente in self.lista_elementos_bom:
+            elemento = componente.elemento_produccion
+            cantidad = componente.cantidad
+
+            if isinstance(elemento, Insumo):
+                costo_total += elemento.get_costo() * cantidad
+            elif isinstance(elemento, Producto):
+                costo_total += elemento.costo_unitario() * cantidad
+        self.costo = costo_total
+
+        return costo_total
 
 
 class ProcesoManufactura: #Clase que representa un proceso de manufactura para un producto
