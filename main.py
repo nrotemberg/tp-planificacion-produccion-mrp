@@ -5,6 +5,7 @@ class ElementoProduccion: #Clase base para Insumo y Producto
         self.unidad_medida = unidad_medida
         self.stock_total = stock_total
         self.stock_reservado = stock_reservado
+        self.lista_elementos_bom = []
         self.set_costo(costo)
 
     def set_costo(self, nuevo_costo):
@@ -13,7 +14,35 @@ class ElementoProduccion: #Clase base para Insumo y Producto
         self.costo = nuevo_costo
 
     def hay_stock_suficiente(self, cantidad_requerida): #Metodo para verificar si hay stock suficiente
-        pass
+        disponible = self.stock_total - self.stock_reservado
+        return disponible >= cantidad_requerida
+
+    def construir_bom_manual(self, elemento, cantidad):
+        self.lista_elementos_bom.append(ComponenteBOM(elemento, cantidad))
+
+    def imprimir_bom(self, nivel=0):
+        indentacion = "  " * nivel
+        print(f"{indentacion}{self.nombre}")
+        for componente in self.lista_elementos_bom:
+            elemento = componente.elemento_produccion
+            print(
+                f"{indentacion}  "
+                f"ComponenteBOM(nombre='{elemento.nombre}', "
+                f"cantidad={componente.cantidad})"
+            )
+            if elemento.lista_elementos_bom:
+                elemento.imprimir_bom(nivel + 2)
+
+    @staticmethod
+    def imprimir_stock(elementos):
+        print("\nNombre       | Cantidad | Reservada")
+        print("-" * 40)
+        for elemento in elementos:
+            print(
+                f"{elemento.nombre:12} | "
+                f"{elemento.stock_total:8} | "
+                f"{elemento.stock_reservado:9}"
+            )
 
     def costo_unitario(self): #Metodo para obtener el costo unitario del elemento de producción
         pass
@@ -51,10 +80,6 @@ class ComponenteBOM: #Clase que representa un componente de la lista de material
 class Producto(ElementoProduccion): #Subclase de ElementoProduccion, representa un producto que se produce a partir de insumos y componentes
     def __init__(self, nombre, unidad_medida, stock_total, stock_reservado, costo):
             super().__init__(nombre, unidad_medida, stock_total, stock_reservado, costo)
-            self.lista_elementos_bom = [] 
-
-    def agregar_a_bom(self, componente): #Metodo para agregar un componente a la lista de elementos BOM del producto
-        self.lista_elementos_bom.append(componente)
 
     def costo_unitario(self): #Metodo para obtener el costo del producto
         costo_total = 0
@@ -72,133 +97,82 @@ class Producto(ElementoProduccion): #Subclase de ElementoProduccion, representa 
         return costo_total
 
 
-class ProcesoManufactura: #Clase que representa un proceso de manufactura para un producto
-    def __init__(self, producto):
-        self.tareas_requeridas = []
-        self.producto = producto
-
-    def agregar_proceso(self):
-        pass
-
-    def modificar_proceso(self): 
-        pass
-
-    def calcular_costo_operativo(self): #Metodo para calcular el costo operativo del proceso de manufactura
-        pass
+class ProcesoManufactura:
+    pass
 
 
-class TareaDefinida: #Clase que representa una tarea especifica dentro de un proceso de manufactura
-    def __init__(self, nombre, tiempo, unidad_trabajo, colaboradores_requeridos, habilidades_requeridas):
-        self.nombre = nombre
-        self.tiempo = tiempo
-        self.unidad_trabajo = unidad_trabajo
-        self.colaboradores_requeridos = colaboradores_requeridos
-        self.habilidades_requeridas = habilidades_requeridas
-
-    def agregar_tarea(self, proceso): #Metodo para agregar una tarea definida a un proceso de manufactura
-        pass
+class TareaDefinida:
+    pass
 
 
-class TareaEnCurso: #Clase que representa una tarea en curso dentro de un proceso de manufactura
-    def __init__(self, nombre, tarea_base, estado):
-        self.nombre = nombre
-        self.colaboradores_asignados = []
-        self.unidades_trabajo_asignadas = []
-        self.tarea_base = tarea_base
-        self.estado = estado
-
-    def actualizar_estado(self): #Metodo para actualizar el estado de la solicitud
-        pass
-
-    def asignar_colaboradores(self): #Metodo para asignar colaboradores a la tarea
-        pass
-
-    def asignar_UTs(self): #Metodo para asignar unidades de trabajo a la tarea
-        pass
+class TareaEnCurso:
+    pass
 
 
-class UnidadTrabajo: #Clase que representa una unidad de trabajo que puede ser asignada a una tarea
-    def __init__(self, nombre, capacidad_max_produccion, costo_fijo, capacidad_colaboradores):
-        self.nombre = nombre
-        self.capacidad_max_produccion = capacidad_max_produccion
-        self.costo_fijo = costo_fijo
-        self.capacidad_colaboradores = capacidad_colaboradores
-        self.periodos_operacion = []
-        self.colaboradores_activos = []
-        self.maquinas_disponibles = []
-
-    def verificar_capacidad(self): #Metodo para verificar si la unidad de trabajo tiene capacidad para ser asignada a una tarea
-        pass
+class UnidadTrabajo:
+    pass
 
 
-class Colaborador: #Clase que representa un colaborador que puede ser asignado a una tarea
-    def __init__(self, nombre, costo_por_hora, habilidades):
-        self.nombre = nombre
-        self.costo_por_hora = costo_por_hora
-        self.habilidades = habilidades
-        self.periodos_operacion = []
-
-    def verificar_disponibilidad(self): #Metodo para verificar si el colaborador está disponible para ser asignado a una tarea en curso
-        pass
-
-    def tiene_habilidad(self, habilidad): #Metodo para verificar si el colaborador tiene la habilidad requerida para la tarea
-        pass
+class Colaborador:
+    pass
 
 
-class PeriodoOperacion: #Clase que representa un periodo de tiempo en el que se realiza una operación, ya sea un trabajador o una maquinaria
-    def __init__(self, inicio, fin):
-        self.inicio = inicio
-        self.fin = fin
-
-    def duracion_horas(self): #Metodo para calcular la duración del periodo de operación en horas
-        pass
-
-    def se_solapa_con(self, otro_periodo): # Verifica si dos periodos de operación se superponen (maquinaria <-> trabajador)
-        pass
+class PeriodoOperacion:
+    pass
 
 
 class Solicitud: #Clase que representa una solicitud de producción de un producto
-    def __init__(self, id, solicitante, fase, producto, cantidad):
+    def __init__(self, id, producto, cantidad):
         self.id = id
-        self.solicitante = solicitante
-        self.fase = fase
         self.producto = producto
         self.cantidad = cantidad
 
+    def _verificar_componentes(self, elemento, cantidad_requerida):
+        """Recursivamente verifica stock de componentes"""
+        if not elemento.lista_elementos_bom:
+            return elemento.hay_stock_suficiente(cantidad_requerida)
+
+        for componente in elemento.lista_elementos_bom:
+            elem = componente.elemento_produccion
+            cant = componente.cantidad * cantidad_requerida
+            if not self._verificar_componentes(elem, cant):
+                return False
+        return True
+    
     def verificar_stock(self): #Metodo para verificar si hay stock suficiente de los elementos de producción necesarios para la solicitud
-        pass
+        return self._verificar_componentes(self.producto, self.cantidad)
 
+    def _reservar_componentes(self, elemento, cantidad_requerida):
+        """Recursivamente reserva componentes"""
+        if not elemento.lista_elementos_bom:
+            elemento.stock_reservado += cantidad_requerida
+            return
+
+        for componente in elemento.lista_elementos_bom:
+            elem = componente.elemento_produccion
+            cant = componente.cantidad * cantidad_requerida
+            self._reservar_componentes(elem, cant)
+    
     def reservar(self): #Metodo para reservar recursos para la solicitud
-        pass
+        if not self.verificar_stock():
+            return False
+        self._reservar_componentes(self.producto, self.cantidad)
+        return True
 
-    def iniciar_produccion(self): #Metodo para iniciar la producción de la solicitud
-        pass
+    def _consumir_componentes(self, elemento, cantidad_requerida):
+        """Recursivamente consume stock de componentes"""
+        if not elemento.lista_elementos_bom:
+            elemento.stock_total -= cantidad_requerida
+            elemento.stock_reservado -= cantidad_requerida
+            return
 
+        for componente in elemento.lista_elementos_bom:
+            elem = componente.elemento_produccion
+            cant = componente.cantidad * cantidad_requerida
+            self._consumir_componentes(elem, cant)
+    
     def consumir_stock(self): #Metodo para consumir el stock del producto solicitado
-        pass
+        self._consumir_componentes(self.producto, self.cantidad)
+        self.producto.stock_total += self.cantidad
+        return True
 
-    def finalizar_produccion(self): #Metodo para finalizar la producción de la solicitud
-        pass
-
-    def detectar_cuello(self): #Metodo para detectar cuellos de botella en la producción
-        pass
-
-
-
-
-
-
-
-
-def hola_mundo():
-    return "hola_mundo"
-
-
-def main():
-    # Aqui ejecutas tus soluciones
-    print(hola_mundo())
-
-
-# No cambiar a partir de aqui
-if __name__ == "__main__":
-    main()
