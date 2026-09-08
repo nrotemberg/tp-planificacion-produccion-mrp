@@ -115,17 +115,18 @@ def test_proceso_manufactura_crea_datos_basicos():
 
 
 def test_tarea_definida_crea_datos_basicos():
-    tarea = m.TareaDefinida("Mezclar", 2.5, "horas", 3)
+    tarea = m.TareaDefinida("Mezclar", 2.5, "horas", 3, ["habilidad1", "habilidad2"])
 
     assert tarea.nombre == "Mezclar"
     assert tarea.tiempo == 2.5
     assert tarea.unidad_trabajo == "horas"
     assert tarea.colaboradores_requeridos == 3
+    assert tarea.habilidades_requeridas == ["habilidad1", "habilidad2"]
     print("OK: test_tarea_definida_crea_datos_basicos")
 
 
 def test_tarea_en_curso_crea_datos_basicos():
-    tarea_base = m.TareaDefinida("Coccion", 1.5, "horas", 2)
+    tarea_base = m.TareaDefinida("Coccion", 1.5, "horas", 2, ["habilidad1", "habilidad2"])
     tarea = m.TareaEnCurso("Coccion_1", tarea_base, "pendiente")
 
     assert tarea.nombre == "Coccion_1"
@@ -150,11 +151,12 @@ def test_unidad_trabajo_crea_datos_basicos():
 
 
 def test_colaborador_crea_datos_basicos():
-    colaborador = m.Colaborador("Ana", 250)
+    colaborador = m.Colaborador("Ana", 250, ["habilidad1", "habilidad2"])
 
     assert colaborador.nombre == "Ana"
     assert colaborador.costo_por_hora == 250
     assert colaborador.periodos_operacion == []
+    assert colaborador.habilidades == ["habilidad1", "habilidad2"]
     print("OK: test_colaborador_crea_datos_basicos")
 
 

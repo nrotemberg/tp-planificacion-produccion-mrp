@@ -96,6 +96,9 @@ class Producto(ElementoProduccion): #Subclase de ElementoProduccion, representa 
 
         return costo_total
 
+    def detectar_ciclo(self): # Metodo para detectar si un producto no requiere de si mismo para su produccion
+        pass
+
 
 class ProcesoManufactura:
     pass
