@@ -1,5 +1,6 @@
 from src.bom import GestorBOM
 from src.inventario import Inventario
+from src.solicitudes import Solicitud
 
 
 class SistemaMRP:
@@ -17,6 +18,11 @@ class SistemaMRP:
             return False
         self.elementos_produccion[elemento.nombre] = elemento
         return True
+
+    def crear_orden_fabricacion(self, id, articulo, cantidad, **parametros):
+        solicitante = parametros.pop("solicitante", None)
+        solicitud = Solicitud(id, solicitante, "creada", articulo, cantidad, **parametros)
+        return self.crear_solicitud(solicitud)
 
     def crear_solicitud(self, solicitud):
         if self.obtener_solicitud_por_id(solicitud.id) is not None:
