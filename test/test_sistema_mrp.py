@@ -20,7 +20,7 @@ def test_agregar_elementos():
     madera = Insumo("Madera", "unidad", 10, 0, 5)
 
     assert sistema.agregar_elemento(madera) is True
-    assert sistema.elementos_produccion == [madera]
+    assert sistema.elementos_produccion == {"Madera": madera}
 
 
 def test_crear_y_obtener_solicitud_por_id():
@@ -68,6 +68,26 @@ def test_iniciar_y_finalizar_produccion_consumen_stock():
     assert mesa.stock_total == 2
 
 
+def test_bom_anidada_reserva_el_stock_de_los_insumos():
+    madera = Insumo("Madera", "unidad", 20, 0, 5)
+    base = Producto("Base", "unidad", 0, 0, 1)
+    mesa = Producto("Mesa", "unidad", 0, 0, 1)
+    base.agregar_a_BOM(ComponenteBOM(madera, 3))
+    mesa.agregar_a_BOM(ComponenteBOM(base, 2))
+    solicitud = Solicitud(1, "Deposito", "creada", mesa, 2)
+    sistema = SistemaMRP()
+    sistema.crear_solicitud(solicitud)
+
+    assert sistema.reservar_recursos(1) is True
+    assert madera.stock_reservado == 12
+
+
+def test_no_se_puede_finalizar_solicitud_sin_iniciarla():
+    sistema, _, _, _ = crear_sistema()
+
+    assert sistema.finalizar_produccion(1) is False
+
+
 def test_metodos_rechazan_id_inexistente():
     sistema = SistemaMRP()
 
@@ -76,5 +96,3 @@ def test_metodos_rechazan_id_inexistente():
     assert sistema.consumir_stock(99) is False
     assert sistema.iniciar_produccion(99) is False
     assert sistema.finalizar_produccion(99) is False
-
-

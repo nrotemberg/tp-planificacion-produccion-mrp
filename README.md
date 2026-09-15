@@ -35,6 +35,21 @@ El sistema ha sido modelado utilizando Programación Orientada a Objetos (POO), 
 ### 4. Flujo de Solicitudes
 * **`Solicitud`**: Maneja el ciclo de vida de una orden de fabricación. Gestiona las fases (creada, planificada, en curso), verificando el stock disponible, reservando los materiales y finalmente iniciando y cerrando la producción para registrar el consumo.
 
+### 5. Simplificación del flujo
+La explosión de la BOM se concentra en `bom.py`, dentro de la clase `GestorBOM`.
+Su método `explotar` recorre todos los niveles y devuelve un diccionario plano
+de insumos y cantidades requeridas.
+
+`Inventario`, definido en `inventario.py`, utiliza esos requerimientos para verificar, reservar y consumir stock. De esta forma `SistemaMRP` coordina el flujo de la solicitud sin repetir la misma lógica recursiva.
+
+El flujo básico se mantiene:
+
+```text
+creada -> planificada -> en curso -> finalizada
+```
+
+Una solicitud sólo reserva materiales cuando está creada, sólo inicia producción cuando está planificada y sólo consume stock cuando está en curso.
+
 
 ## Reglas de Negocio Clave
 

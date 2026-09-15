@@ -1,41 +1,51 @@
+from src.bom import GestorBOM
+from src.inventario import Inventario
+
+
 class SistemaMRP:
     def __init__(self):
-        self.elementos_produccion = []
+        self.elementos_produccion = {}
         self.colaboradores = []
         self.unidades_trabajo = []
-        self.solicitudes = []
+        self.solicitudes = {}
+        self.inventario = Inventario()
+        self.bom = GestorBOM()
 
     def agregar_elemento(self, elemento):
-        self.elementos_produccion.append(elemento)
+        if elemento.nombre in self.elementos_produccion:
+            return False
+        self.elementos_produccion[elemento.nombre] = elemento
         return True
 
     def crear_solicitud(self, solicitud):
         if self.obtener_solicitud_por_id(solicitud.id) is not None:
             return False
-        self.solicitudes.append(solicitud)
+        self.solicitudes[solicitud.id] = solicitud
         return True
 
     def obtener_solicitud_por_id(self, id_solicitud):
-        for solicitud in self.solicitudes:
-            if solicitud.id == id_solicitud:
-                return solicitud
-        return None
+        return self.solicitudes.get(id_solicitud)
 
     def reservar_recursos(self, id_solicitud):
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
-        if solicitud is None:
+        if solicitud is None or solicitud.estado != "creada":
             return False
-        if not self.verificar_stock(id_solicitud):
+
+        requerimientos = self._obtener_requerimientos(solicitud)
+        if not self.inventario.hay_stock(requerimientos):
             return False
-        self._reservar_componentes(solicitud.producto, solicitud.cantidad)
+
+        self.inventario.reservar(requerimientos)
         solicitud.cambiar_estado("planificada")
         return True
 
     def consumir_stock(self, id_solicitud):
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
-        if solicitud is None:
+        if solicitud is None or solicitud.estado != "en curso":
             return False
-        self._consumir_componentes(solicitud.producto, solicitud.cantidad)
+
+        requerimientos = self._obtener_requerimientos(solicitud)
+        self.inventario.consumir(requerimientos)
         solicitud.producto.stock_total += solicitud.cantidad
         solicitud.cambiar_estado("finalizada")
         return True
@@ -53,11 +63,12 @@ class SistemaMRP:
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
         if solicitud is None:
             return False
-        return self._verificar_componentes(solicitud.producto, solicitud.cantidad)
+        requerimientos = self._obtener_requerimientos(solicitud)
+        return self.inventario.hay_stock(requerimientos)
 
     def iniciar_produccion(self, id_solicitud):
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
-        if solicitud is None or solicitud.estado not in ("planificada", "creada"):
+        if solicitud is None or solicitud.estado != "planificada":
             return False
         solicitud.cambiar_estado("en curso")
         return True
@@ -68,31 +79,5 @@ class SistemaMRP:
     def detectar_cuello(self):
         pass
 
-    def _verificar_componentes(self, elemento, cantidad_requerida):
-        if not elemento.lista_elementos_bom:
-            return elemento.hay_stock_suficiente(cantidad_requerida)
-
-        for componente in elemento.lista_elementos_bom:
-            cantidad = componente.cantidad * cantidad_requerida
-            if not self._verificar_componentes(componente.elemento_produccion, cantidad):
-                return False
-        return True
-
-    def _reservar_componentes(self, elemento, cantidad_requerida):
-        if not elemento.lista_elementos_bom:
-            elemento.stock_reservado += cantidad_requerida
-            return
-
-        for componente in elemento.lista_elementos_bom:
-            cantidad = componente.cantidad * cantidad_requerida
-            self._reservar_componentes(componente.elemento_produccion, cantidad)
-
-    def _consumir_componentes(self, elemento, cantidad_requerida):
-        if not elemento.lista_elementos_bom:
-            elemento.stock_total -= cantidad_requerida
-            elemento.stock_reservado -= cantidad_requerida
-            return
-
-        for componente in elemento.lista_elementos_bom:
-            cantidad = componente.cantidad * cantidad_requerida
-            self._consumir_componentes(componente.elemento_produccion, cantidad)
+    def _obtener_requerimientos(self, solicitud):
+        return self.bom.explotar(solicitud.producto, solicitud.cantidad)

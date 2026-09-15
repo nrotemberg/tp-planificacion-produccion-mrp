@@ -73,18 +73,19 @@ class Producto(ElementoProduccion):
         return self.costo
 
     def detectar_ciclo(self):
-        def contiene_producto(elemento, visitados):
-            if elemento is self:
+        for componente in self.lista_elementos_bom:
+            if self._contiene_elemento(componente.elemento_produccion, set()):
                 return True
-            if elemento in visitados:
-                return False
-            visitados.add(elemento)
-            for componente in elemento.lista_elementos_bom:
-                if contiene_producto(componente.elemento_produccion, visitados):
-                    return True
+        return False
+
+    def _contiene_elemento(self, elemento, visitados):
+        if elemento is self:
+            return True
+        if elemento in visitados:
             return False
 
-        for componente in self.lista_elementos_bom:
-            if contiene_producto(componente.elemento_produccion, set()):
+        visitados.add(elemento)
+        for componente in elemento.lista_elementos_bom:
+            if self._contiene_elemento(componente.elemento_produccion, visitados):
                 return True
         return False
