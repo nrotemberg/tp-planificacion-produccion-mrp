@@ -3,6 +3,7 @@ from datetime import datetime
 import pytest
 
 from src.manufactura import PeriodoOperacion, UnidadTrabajo
+from src.excepciones import CantidadInvalidaError, TipoInvalidoError
 
 
 def crear_unidad_trabajo(
@@ -48,7 +49,7 @@ def test_asignar_periodo_agrega_un_periodo_valido():
 def test_asignar_periodo_rechaza_un_valor_invalido():
 	unidad = crear_unidad_trabajo()
 
-	with pytest.raises(TypeError, match="Debe asignarse un PeriodoOperacion"):
+	with pytest.raises(TipoInvalidoError, match="Debe asignarse un PeriodoOperacion"):
 		unidad.asignar_periodo("08:00-10:00")
 
 	assert unidad.periodos_ocupados == []
@@ -64,7 +65,7 @@ def test_verificar_capacidad_acepta_cantidad_dentro_del_limite():
 def test_verificar_capacidad_rechaza_cantidades_no_positivas(cantidad):
 	unidad = crear_unidad_trabajo()
 
-	with pytest.raises(ValueError, match="debe ser mayor que cero"):
+	with pytest.raises(CantidadInvalidaError, match="debe ser mayor que cero"):
 		unidad.verificar_capacidad(cantidad)
 
 
@@ -89,7 +90,7 @@ def test_verificar_capacidad_devuelve_false_si_supera_el_limite_de_colaboradores
 def test_verificar_capacidad_rechaza_colaboradores_que_no_sean_lista():
 	unidad = crear_unidad_trabajo()
 
-	with pytest.raises(TypeError, match="deben enviarse en una lista"):
+	with pytest.raises(TipoInvalidoError, match="deben enviarse en una lista"):
 		unidad.verificar_capacidad(5, colaboradores=(object(),))
 
 

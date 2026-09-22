@@ -1,6 +1,7 @@
 import pytest
 
 from src.manufactura import TareaEnCurso
+from src.excepciones import EstadoSolicitudError, TipoInvalidoError
 
 
 def crear_tarea_en_curso(nombre="Corte", tarea_base=None, estado="pendiente"):
@@ -52,7 +53,7 @@ def test_actualizar_estado_registra_toda_la_evolucion():
 def test_actualizar_estado_rechaza_un_estado_invalido():
 	tarea = crear_tarea_en_curso()
 
-	with pytest.raises(ValueError, match="Estado no válido"):
+	with pytest.raises(EstadoSolicitudError, match="Estado no válido"):
 		tarea.actualizar_estado("desconocido")
 
 	assert tarea.estado == "pendiente"
@@ -71,7 +72,7 @@ def test_asignar_colaboradores_guarda_la_lista_recibida():
 def test_asignar_colaboradores_rechaza_un_valor_que_no_sea_lista():
 	tarea = crear_tarea_en_curso()
 
-	with pytest.raises(TypeError, match="deben enviarse en una lista"):
+	with pytest.raises(TipoInvalidoError, match="deben enviarse en una lista"):
 		tarea.asignar_colaboradores(None)
 
 	assert tarea.colaboradores == []
@@ -89,7 +90,7 @@ def test_asignar_unidades_de_trabajo_guarda_la_lista_recibida():
 def test_asignar_unidades_de_trabajo_rechaza_un_valor_que_no_sea_lista():
 	tarea = crear_tarea_en_curso()
 
-	with pytest.raises(TypeError, match="deben enviarse en una lista"):
+	with pytest.raises(TipoInvalidoError, match="deben enviarse en una lista"):
 		tarea.asignar_UTs(None)
 
 	assert tarea.unidades_trabajo == []

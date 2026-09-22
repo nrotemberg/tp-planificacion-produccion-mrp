@@ -1,6 +1,7 @@
 import pytest
 
 from src.manufactura import Colaborador, TareaDefinida, UnidadTrabajo
+from src.excepciones import TipoInvalidoError
 
 
 def crear_tarea(
@@ -58,7 +59,7 @@ def test_agregar_subtarea_agrega_y_devuelve_la_subtarea():
 def test_agregar_subtarea_rechaza_valor_nulo():
 	tarea = crear_tarea()
 
-	with pytest.raises(ValueError, match="no puede ser nula"):
+	with pytest.raises(TipoInvalidoError, match="no puede ser nula"):
 		tarea.agregar_subtarea(None)
 
 	assert tarea.subtareas == []
@@ -87,7 +88,7 @@ def test_validar_habilidades_sin_requisitos_devuelve_true():
 def test_validar_habilidades_rechaza_un_valor_que_no_sea_lista():
 	tarea = crear_tarea()
 
-	with pytest.raises(TypeError, match="deben enviarse en una lista"):
+	with pytest.raises(TipoInvalidoError, match="deben enviarse en una lista"):
 		tarea.validar_habilidades(None)
 
 
@@ -102,7 +103,7 @@ def test_cantidad_colaboradores_suficiente_compara_con_los_requeridos():
 def test_cantidad_colaboradores_suficiente_rechaza_un_valor_que_no_sea_lista():
 	tarea = crear_tarea()
 
-	with pytest.raises(TypeError, match="deben enviarse en una lista"):
+	with pytest.raises(TipoInvalidoError, match="deben enviarse en una lista"):
 		tarea.cantidad_colaboradores_suficiente(None)
 
 

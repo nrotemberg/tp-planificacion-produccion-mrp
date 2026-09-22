@@ -56,7 +56,7 @@ def crear_sistema():
     madera = Insumo("Madera", "unidad", 10, 0, 5)
     mesa = Producto("Mesa", "unidad", 0, 0, 1)
     mesa.agregar_a_BOM(ComponenteBOM(madera, 2))
-    solicitud = Solicitud(1, "Deposito", "creada", mesa, 2)
+    solicitud = Solicitud(1, "Deposito", mesa, 2)
     sistema = SistemaMRP()
     sistema.agregar_elemento(madera)
     sistema.agregar_elemento(mesa)
@@ -123,7 +123,7 @@ def test_bom_anidada_reserva_el_stock_de_los_insumos():
     mesa = Producto("Mesa", "unidad", 0, 0, 1)
     base.agregar_a_BOM(ComponenteBOM(madera, 3))
     mesa.agregar_a_BOM(ComponenteBOM(base, 2))
-    solicitud = Solicitud(1, "Deposito", "creada", mesa, 2)
+    solicitud = Solicitud(1, "Deposito", mesa, 2)
     sistema = SistemaMRP()
     sistema.crear_solicitud(solicitud)
 
@@ -171,7 +171,7 @@ def test_bom_considera_stock_de_subproducto_intermedio():
     ranger = Producto("Ranger", "unidad", 0, 0, 1)
     v6.agregar_a_BOM(ComponenteBOM(aluminio, 2))
     ranger.agregar_a_BOM(ComponenteBOM(v6, 1))
-    solicitud = Solicitud(1, "Deposito", "creada", ranger, 10)
+    solicitud = Solicitud(1, "Deposito", ranger, 10)
     sistema = SistemaMRP()
     sistema.crear_solicitud(solicitud)
 
@@ -189,7 +189,7 @@ def test_verificar_stock_considera_subproductos_y_requerimientos_netos():
     ranger = Producto("Ranger", "unidad", 0, 0, 1)
     v6.agregar_a_BOM(ComponenteBOM(aluminio, 2))
     ranger.agregar_a_BOM(ComponenteBOM(v6, 1))
-    solicitud = Solicitud(1, "Deposito", "creada", ranger, 10)
+    solicitud = Solicitud(1, "Deposito", ranger, 10)
     sistema = SistemaMRP()
     sistema.crear_solicitud(solicitud)
 
@@ -207,7 +207,7 @@ def test_reservar_y_consumir_stock_intermedio():
     ranger = Producto("Ranger", "unidad", 0, 0, 1)
     v6.agregar_a_BOM(ComponenteBOM(aluminio, 2))
     ranger.agregar_a_BOM(ComponenteBOM(v6, 1))
-    solicitud = Solicitud(1, "Deposito", "creada", ranger, 10)
+    solicitud = Solicitud(1, "Deposito", ranger, 10)
     sistema = SistemaMRP()
     sistema.crear_solicitud(solicitud)
 

@@ -1,6 +1,7 @@
 import pytest
 
 from src.manufactura import ProcesoManufactura
+from src.excepciones import TipoInvalidoError
 
 
 class TareaConCosto:
@@ -33,7 +34,7 @@ def test_agregar_tarea_agrega_y_devuelve_la_tarea():
 def test_agregar_tarea_rechaza_tarea_nula():
 	proceso = ProcesoManufactura(object())
 
-	with pytest.raises(ValueError, match="no puede ser nula"):
+	with pytest.raises(TipoInvalidoError, match="no puede ser nula"):
 		proceso.agregar_tarea(None)
 
 	assert proceso.tareas == []
@@ -62,7 +63,7 @@ def test_modificar_proceso_rechaza_un_valor_que_no_sea_lista():
 	proceso = ProcesoManufactura(object())
 	proceso.agregar_tarea(tarea_original)
 
-	with pytest.raises(TypeError, match="Debe recibir una lista"):
+	with pytest.raises(TipoInvalidoError, match="Debe recibir una lista"):
 		proceso.modificar_proceso((object(),))
 
 	assert proceso.tareas == [tarea_original]

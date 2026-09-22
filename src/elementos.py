@@ -1,3 +1,6 @@
+from src.excepciones import CantidadInvalidaError, CostoInvalidoError, TipoInvalidoError
+
+
 class ElementoProduccion:
     def __init__(self, nombre, unidad_medida, stock_total, stock_reservado, costo):
         self.nombre = nombre
@@ -9,7 +12,7 @@ class ElementoProduccion:
 
     def set_costo(self, nuevo_costo):
         if not isinstance(nuevo_costo, (int, float)) or nuevo_costo <= 0:
-            raise ValueError("El costo debe ser mayor a 0")
+            raise CostoInvalidoError("El costo debe ser mayor a 0")
         self.costo = nuevo_costo
 
     def hay_stock_suficiente(self, cantidad_requerida):
@@ -20,7 +23,7 @@ class ElementoProduccion:
 
     def agregar_a_BOM(self, componente):
         if not isinstance(componente, ComponenteBOM):
-            raise TypeError("El componente debe ser una instancia de ComponenteBOM")
+            raise TipoInvalidoError("El componente debe ser una instancia de ComponenteBOM")
         self.lista_elementos_bom.append(componente)
 
     def imprimir_bom(self, nivel=0):
@@ -58,7 +61,7 @@ class ComponenteBOM:
 
     def validar_cantidad(self, nueva_cantidad):
         if not isinstance(nueva_cantidad, int) or isinstance(nueva_cantidad, bool) or nueva_cantidad <= 0:
-            raise ValueError("La cantidad debe ser un número entero positivo")
+            raise CantidadInvalidaError("La cantidad debe ser un número entero positivo")
         self.cantidad = nueva_cantidad
 
 

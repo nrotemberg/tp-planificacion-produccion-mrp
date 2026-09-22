@@ -1,7 +1,10 @@
+from src.excepciones import CantidadInvalidaError
+
+
 class Solicitud:
     def __init__(self, id, solicitante, producto, cantidad, **parametros):
         if not isinstance(cantidad, int) or cantidad <= 0:
-            raise ValueError("La cantidad debe ser un entero positivo")
+            raise CantidadInvalidaError("La cantidad debe ser un entero positivo")
         self.id = id
         self.solicitante = solicitante
         self.estado = "creada"

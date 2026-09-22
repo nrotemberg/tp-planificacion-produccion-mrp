@@ -1,6 +1,7 @@
 import pytest
 
 from src.elementos import ElementoProduccion, Insumo, Producto, ComponenteBOM
+from src.excepciones import CostoInvalidoError, TipoInvalidoError
 
 
 def crear_insumo(nombre="Madera", stock=20, reservado=0, costo=10):
@@ -23,11 +24,11 @@ def test_set_costo_rechaza_valores_invalidos():
     elemento.set_costo(30)
     assert elemento.costo == 30
 
-    with pytest.raises(ValueError):
+    with pytest.raises(CostoInvalidoError):
         elemento.set_costo(0)
-    with pytest.raises(ValueError):
+    with pytest.raises(CostoInvalidoError):
         elemento.set_costo(-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(CostoInvalidoError):
         elemento.set_costo("30")
 
 
@@ -52,7 +53,7 @@ def test_construir_bom_manual_y_agregar_a_bom():
 def test_agregar_a_bom_rechaza_tipo_incorrecto():
     producto = Producto("Mesa", "unidad", 0, 0, 1)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TipoInvalidoError):
         producto.agregar_a_BOM("incorrecto")
 
 

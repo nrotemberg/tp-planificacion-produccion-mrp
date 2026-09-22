@@ -1,6 +1,7 @@
 import pytest
 
 from src.elementos import Insumo
+from src.excepciones import CostoInvalidoError
 
 
 def test_get_costo():
@@ -20,5 +21,5 @@ def test_actualizar_costo():
 def test_actualizar_costo_rechaza_valor_invalido():
     insumo = Insumo("Harina", "kg", 50, 0, 20)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(CostoInvalidoError):
         insumo.actualizar_costo(0)

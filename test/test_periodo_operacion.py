@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from src.manufactura import PeriodoOperacion
+from src.excepciones import PeriodoOcupadoError, TipoInvalidoError
 
 
 def crear_datetime(hora, minuto=0):
@@ -20,12 +21,12 @@ def test_crear_periodo_operacion_inicializa_inicio_y_fin():
 
 
 def test_crear_periodo_rechaza_inicio_que_no_sea_datetime():
-	with pytest.raises(TypeError, match="Inicio y fin deben ser datetime"):
+	with pytest.raises(TipoInvalidoError, match="Inicio y fin deben ser datetime"):
 		PeriodoOperacion("08:00", crear_datetime(10))
 
 
 def test_crear_periodo_rechaza_fin_que_no_sea_datetime():
-	with pytest.raises(TypeError, match="Inicio y fin deben ser datetime"):
+	with pytest.raises(TipoInvalidoError, match="Inicio y fin deben ser datetime"):
 		PeriodoOperacion(crear_datetime(8), "10:00")
 
 
@@ -37,7 +38,7 @@ def test_crear_periodo_rechaza_fin_que_no_sea_datetime():
 	],
 )
 def test_crear_periodo_rechaza_fin_igual_o_anterior_al_inicio(inicio, fin):
-	with pytest.raises(ValueError, match="fecha fin debe ser posterior"):
+	with pytest.raises(PeriodoOcupadoError, match="fecha fin debe ser posterior"):
 		PeriodoOperacion(inicio, fin)
 
 def test_duracion_horas_devuelve_la_duracion_completa():
@@ -79,5 +80,5 @@ def test_se_solapa_con_devuelve_false_para_periodos_separados():
 def test_se_solapa_con_rechaza_un_valor_que_no_sea_periodo():
 	periodo = PeriodoOperacion(crear_datetime(8), crear_datetime(10))
 
-	with pytest.raises(TypeError, match="Debe compararse con otro PeriodoOperacion"):
+	with pytest.raises(TipoInvalidoError, match="Debe compararse con otro PeriodoOperacion"):
 		periodo.se_solapa_con(None)

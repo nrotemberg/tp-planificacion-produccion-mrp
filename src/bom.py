@@ -1,3 +1,6 @@
+from src.excepciones import BOMCiclicaError
+
+
 class GestorBOM:
     """Recorre la BOM de un elemento para calcular materiales o mostrarla."""
 
@@ -47,7 +50,7 @@ class GestorBOM:
             return
 
         if nodo in self.visitados:
-            raise ValueError("La BOM contiene un ciclo")
+            raise BOMCiclicaError("La BOM contiene un ciclo")
 
         self.visitados.add(nodo)
         for componente in nodo.lista_elementos_bom:
@@ -72,7 +75,7 @@ class GestorBOM:
     def _agregar_lineas(self, nodo, necesidad, prefijo):
         """Agrega a self.lineas el subarbol de `nodo` con el `prefijo` dado."""
         if nodo in self.visitados:
-            raise ValueError("La BOM contiene un ciclo")
+            raise BOMCiclicaError("La BOM contiene un ciclo")
 
         self.visitados.add(nodo)
         componentes = nodo.lista_elementos_bom

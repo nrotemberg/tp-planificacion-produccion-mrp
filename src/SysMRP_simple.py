@@ -48,7 +48,7 @@ class SistemaMRP:
         self.inventario.reservar(faltantes)
         self.inventario.reservar(disponibles)
         self.planes_materiales[solicitud.id] = (faltantes, disponibles)
-        solicitud.cambiar_estado("planificada")
+        solicitud.cambiar_estado()
         return True
 
     def consumir_stock(self, id_solicitud):
@@ -63,7 +63,7 @@ class SistemaMRP:
         self.inventario.consumir(faltantes)
         self.inventario.consumir(disponibles)
         solicitud.producto.stock_total += solicitud.cantidad
-        solicitud.cambiar_estado("finalizada")
+        solicitud.cambiar_estado()
         self.planes_materiales.pop(solicitud.id, None)
         return True
 
@@ -89,7 +89,7 @@ class SistemaMRP:
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
         if solicitud is None or solicitud.estado != "planificada":
             return False
-        solicitud.cambiar_estado("en curso")
+        solicitud.cambiar_estado()
         return True
 
     def finalizar_produccion(self, id_solicitud):

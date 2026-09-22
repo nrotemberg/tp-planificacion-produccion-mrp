@@ -1,5 +1,12 @@
 from datetime import datetime
 
+from src.excepciones import (
+    CantidadInvalidaError,
+    EstadoSolicitudError,
+    PeriodoOcupadoError,
+    TipoInvalidoError,
+)
+
 
 class ProcesoManufactura:
     def __init__(self, producto):
@@ -8,7 +15,7 @@ class ProcesoManufactura:
 
     def agregar_tarea(self, tarea):
         if tarea is None:
-            raise ValueError("La tarea no puede ser nula")
+            raise TipoInvalidoError("La tarea no puede ser nula")
         self.tareas.append(tarea)
         return tarea
 
@@ -17,7 +24,7 @@ class ProcesoManufactura:
 
     def modificar_proceso(self, tareas):
         if not isinstance(tareas, list):
-            raise TypeError("Debe recibir una lista de tareas")
+            raise TipoInvalidoError("Debe recibir una lista de tareas")
         self.tareas = tareas
         return self.tareas
 
@@ -39,13 +46,13 @@ class TareaDefinida:
 
     def agregar_subtarea(self, subtarea):
         if subtarea is None:
-            raise ValueError("La subtarea no puede ser nula")
+            raise TipoInvalidoError("La subtarea no puede ser nula")
         self.subtareas.append(subtarea)
         return subtarea
 
     def validar_habilidades(self, colaboradores):
         if not isinstance(colaboradores, list):
-            raise TypeError("Los colaboradores deben enviarse en una lista")
+            raise TipoInvalidoError("Los colaboradores deben enviarse en una lista")
 
         for habilidad in self.habilidades_requeridas:
             if not any(colaborador.tiene_habilidad(habilidad) for colaborador in colaboradores):
@@ -54,7 +61,7 @@ class TareaDefinida:
 
     def cantidad_colaboradores_suficiente(self, colaboradores):
         if not isinstance(colaboradores, list):
-            raise TypeError("Los colaboradores deben enviarse en una lista")
+            raise TipoInvalidoError("Los colaboradores deben enviarse en una lista")
         return len(colaboradores) >= len(self.colaboradores_requeridos)
 
     def costo_operativo(self):
@@ -83,18 +90,18 @@ class TareaEnCurso:
 
     def actualizar_estado(self, estado):
         if estado not in self.ESTADOS_VALIDOS:
-            raise ValueError("Estado no válido")
+            raise EstadoSolicitudError("Estado no válido")
         self.estado = estado
         self.historial_estados.append(estado)
 
     def asignar_colaboradores(self, colaboradores):
         if not isinstance(colaboradores, list):
-            raise TypeError("Los colaboradores deben enviarse en una lista")
+            raise TipoInvalidoError("Los colaboradores deben enviarse en una lista")
         self.colaboradores = colaboradores
 
     def asignar_UTs(self, unidades_trabajo):
         if not isinstance(unidades_trabajo, list):
-            raise TypeError("Las unidades de trabajo deben enviarse en una lista")
+            raise TipoInvalidoError("Las unidades de trabajo deben enviarse en una lista")
         self.unidades_trabajo = unidades_trabajo
 
 
@@ -108,19 +115,19 @@ class UnidadTrabajo:
 
     def asignar_periodo(self, periodo):
         if not isinstance(periodo, PeriodoOperacion):
-            raise TypeError("Debe asignarse un PeriodoOperacion")
+            raise TipoInvalidoError("Debe asignarse un PeriodoOperacion")
         self.periodos_ocupados.append(periodo)
 
     def verificar_capacidad(self, cantidad, periodo=None, colaboradores=None):
         if cantidad <= 0:
-            raise ValueError("La cantidad debe ser mayor que cero")
+            raise CantidadInvalidaError("La cantidad debe ser mayor que cero")
 
         if cantidad > self.capacidad_max_produccion:
             return False
 
         if colaboradores is not None:
             if not isinstance(colaboradores, list):
-                raise TypeError("Los colaboradores deben enviarse en una lista")
+                raise TipoInvalidoError("Los colaboradores deben enviarse en una lista")
             if len(colaboradores) > self.capacidad_colaboradores:
                 return False
 
@@ -144,12 +151,12 @@ class Colaborador:
 
     def asignar_periodo(self, periodo):
         if not isinstance(periodo, PeriodoOperacion):
-            raise TypeError("Debe asignarse un PeriodoOperacion")
+            raise TipoInvalidoError("Debe asignarse un PeriodoOperacion")
         self.periodos_ocupados.append(periodo)
 
     def verificar_disponibilidad(self, periodo):
         if not isinstance(periodo, PeriodoOperacion):
-            raise TypeError("Debe verificarse con un PeriodoOperacion")
+            raise TipoInvalidoError("Debe verificarse con un PeriodoOperacion")
 
         for periodo_ocupado in self.periodos_ocupados:
             if periodo.se_solapa_con(periodo_ocupado):
@@ -160,9 +167,9 @@ class Colaborador:
 class PeriodoOperacion:
     def __init__(self, inicio, fin):
         if not isinstance(inicio, datetime) or not isinstance(fin, datetime):
-            raise TypeError("Inicio y fin deben ser datetime")
+            raise TipoInvalidoError("Inicio y fin deben ser datetime")
         if fin <= inicio:
-            raise ValueError("La fecha fin debe ser posterior a la fecha inicio")
+            raise PeriodoOcupadoError("La fecha fin debe ser posterior a la fecha inicio")
         self.inicio = inicio
         self.fin = fin
 
@@ -172,5 +179,5 @@ class PeriodoOperacion:
 
     def se_solapa_con(self, otro):
         if not isinstance(otro, PeriodoOperacion):
-            raise TypeError("Debe compararse con otro PeriodoOperacion")
+            raise TipoInvalidoError("Debe compararse con otro PeriodoOperacion")
         return not (self.fin <= otro.inicio or otro.fin <= self.inicio)

@@ -1,6 +1,7 @@
 import pytest
 
 from src.elementos import ComponenteBOM, Insumo, Producto
+from src.excepciones import CantidadInvalidaError
 from src.solicitudes import Solicitud
 
 
@@ -8,7 +9,7 @@ def crear_solicitud(cantidad=2):
     madera = Insumo("Madera", "unidad", 10, 0, 5)
     mesa = Producto("Mesa", "unidad", 0, 0, 1)
     mesa.agregar_a_BOM(ComponenteBOM(madera, 2))
-    solicitud = Solicitud(1, "Deposito", "creada", mesa, cantidad)
+    solicitud = Solicitud(1, "Deposito", mesa, cantidad)
     return solicitud, madera, mesa
 
 
@@ -20,12 +21,12 @@ def test_crear_solicitud_y_cambiar_estado():
     assert solicitud.estado == "creada"
     assert solicitud.cantidad == 2
 
-    solicitud.cambiar_estado("planificada")
+    solicitud.cambiar_estado()
     assert solicitud.estado == "planificada"
 
 
 def test_solicitud_rechaza_cantidad_invalida():
     producto = Producto("Mesa", "unidad", 0, 0, 1)
 
-    with pytest.raises(ValueError):
-        Solicitud(1, "Deposito", "creada", producto, 0)
+    with pytest.raises(CantidadInvalidaError):
+        Solicitud(1, "Deposito", producto, 0)

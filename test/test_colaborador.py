@@ -3,6 +3,7 @@ from datetime import datetime
 import pytest
 
 from src.manufactura import Colaborador, PeriodoOperacion
+from src.excepciones import TipoInvalidoError
 
 
 def crear_colaborador(nombre="Ana", costo_por_hora=50, habilidades=None):
@@ -56,7 +57,7 @@ def test_asignar_periodo_agrega_un_periodo_valido():
 def test_asignar_periodo_rechaza_un_valor_invalido():
 	colaborador = crear_colaborador()
 
-	with pytest.raises(TypeError, match="Debe asignarse un PeriodoOperacion"):
+	with pytest.raises(TipoInvalidoError, match="Debe asignarse un PeriodoOperacion"):
 		colaborador.asignar_periodo("08:00-10:00")
 
 	assert colaborador.periodos_ocupados == []
@@ -85,5 +86,5 @@ def test_verificar_disponibilidad_es_false_si_hay_solapamiento():
 def test_verificar_disponibilidad_rechaza_un_valor_invalido():
 	colaborador = crear_colaborador()
 
-	with pytest.raises(TypeError, match="Debe verificarse con un PeriodoOperacion"):
+	with pytest.raises(TipoInvalidoError, match="Debe verificarse con un PeriodoOperacion"):
 		colaborador.verificar_disponibilidad(None)
