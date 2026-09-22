@@ -45,7 +45,7 @@ def crear_ranger_ejemplo():
 
 def mostrar_ejemplo_ranger():
     """Imprime la BOM completa de 10 Rangers para verla manualmente."""
-    GestorBOM().mostrar_bom_con_insumos(crear_ranger_ejemplo(), 10)
+    print(GestorBOM().arbol_texto(crear_ranger_ejemplo(), 10))
 
 
 if __name__ == "__main__":
@@ -131,8 +131,8 @@ def test_bom_anidada_reserva_el_stock_de_los_insumos():
     assert madera.stock_reservado == 12
 
 
-def test_mostrar_bom_muestra_arbol_completo_sin_consultar_stock(capsys):
-    GestorBOM().mostrar_bom(crear_ranger_ejemplo(), 10)
+def test_arbol_texto_muestra_bom_completa_sin_consultar_stock(capsys):
+    print(GestorBOM().arbol_texto(crear_ranger_ejemplo(), 10))
 
     salida = capsys.readouterr().out
     assert salida == (
@@ -152,14 +152,17 @@ def test_mostrar_bom_muestra_arbol_completo_sin_consultar_stock(capsys):
     )
 
 
-def test_tabla_de_insumos_agrega_elementos_repetidos():
-    tabla = GestorBOM().formatear_tabla_insumos(crear_ranger_ejemplo(), 10)
+def test_calcular_requerimientos_agrega_elementos_repetidos():
+    ranger = crear_ranger_ejemplo()
+    insumos, _ = GestorBOM().calcular_requerimientos(ranger, 10)
 
-    assert "| Aluminio |      260 |" in tabla
-    assert "| Acero    |      450 |" in tabla
-    assert "| Goma     |       40 |" in tabla
-    assert "| Tela     |      120 |" in tabla
-    assert "| Vidrio   |       60 |" in tabla
+    # Verificamos que se agreguen las cantidades totales por insumo (por nombre)
+    cantidades_por_nombre = {insumo.nombre: cant for insumo, cant in insumos.items()}
+    assert cantidades_por_nombre["Aluminio"] == 260
+    assert cantidades_por_nombre["Acero"] == 450
+    assert cantidades_por_nombre["Goma"] == 40
+    assert cantidades_por_nombre["Tela"] == 120
+    assert cantidades_por_nombre["Vidrio"] == 60
 
 
 def test_bom_considera_stock_de_subproducto_intermedio():
@@ -174,7 +177,8 @@ def test_bom_considera_stock_de_subproducto_intermedio():
 
     bom_original = list(ranger.lista_elementos_bom)
     bom_v6_original = list(v6.lista_elementos_bom)
-    assert sistema._obtener_requerimientos(solicitud) == {aluminio: 12}
+    faltantes, _ = sistema._obtener_plan_materiales(solicitud)
+    assert faltantes == {aluminio: 12}
     assert ranger.lista_elementos_bom == bom_original
     assert v6.lista_elementos_bom == bom_v6_original
 

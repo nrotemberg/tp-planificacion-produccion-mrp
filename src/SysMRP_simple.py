@@ -39,15 +39,15 @@ class SistemaMRP:
         if solicitud is None or solicitud.estado != "creada":
             return False
 
-        requerimientos, consumos_stock = self._obtener_plan_materiales(solicitud)
-        if not self.inventario.hay_stock(requerimientos):
+        faltantes, disponibles = self._obtener_plan_materiales(solicitud)
+        if not self.inventario.hay_stock(faltantes):
             return False
-        if not self.inventario.hay_stock(consumos_stock):
+        if not self.inventario.hay_stock(disponibles):
             return False
 
-        self.inventario.reservar(requerimientos)
-        self.inventario.reservar(consumos_stock)
-        self.planes_materiales[solicitud.id] = (requerimientos, consumos_stock)
+        self.inventario.reservar(faltantes)
+        self.inventario.reservar(disponibles)
+        self.planes_materiales[solicitud.id] = (faltantes, disponibles)
         solicitud.cambiar_estado("planificada")
         return True
 
@@ -56,12 +56,12 @@ class SistemaMRP:
         if solicitud is None or solicitud.estado != "en curso":
             return False
 
-        requerimientos, consumos_stock = self.planes_materiales.get(
+        faltantes, disponibles = self.planes_materiales.get(
             solicitud.id,
             self._obtener_plan_materiales(solicitud),
         )
-        self.inventario.consumir(requerimientos)
-        self.inventario.consumir(consumos_stock)
+        self.inventario.consumir(faltantes)
+        self.inventario.consumir(disponibles)
         solicitud.producto.stock_total += solicitud.cantidad
         solicitud.cambiar_estado("finalizada")
         self.planes_materiales.pop(solicitud.id, None)
@@ -80,9 +80,9 @@ class SistemaMRP:
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
         if solicitud is None:
             return False
-        requerimientos, consumos_stock = self._obtener_plan_materiales(solicitud)
-        return self.inventario.hay_stock(requerimientos) and self.inventario.hay_stock(
-            consumos_stock
+        faltantes, disponibles = self._obtener_plan_materiales(solicitud)
+        return self.inventario.hay_stock(faltantes) and self.inventario.hay_stock(
+            disponibles
         )
 
     def iniciar_produccion(self, id_solicitud):
@@ -98,22 +98,16 @@ class SistemaMRP:
     def detectar_cuello(self):
         pass
 
-    def _obtener_requerimientos(self, solicitud):
-        requerimientos, _ = self._obtener_plan_materiales(solicitud)
-        return requerimientos
-
     def _obtener_plan_materiales(self, solicitud):
         """Separa lo que hay que fabricar de lo que ya existe en stock.
 
-        `requerimientos` contiene los insumos faltantes que `hay_stock`
-        verifica para fabricar. `consumos_stock` contiene los subproductos
-        que ya estaban disponibles y que también deben reservarse para no
-        asignarlos a otra solicitud.
+        `faltantes` contiene los insumos que `hay_stock` verifica para
+        fabricar. `disponibles` contiene los subproductos que ya estaban en
+        stock y que tambien deben reservarse para no asignarlos a otra
+        solicitud.
         """
-        consumos_stock = {}
-        return self.bom.explotar(
+        return self.bom.calcular_requerimientos(
             solicitud.producto,
             solicitud.cantidad,
-            self.inventario,
-            consumos_stock,
-        ), consumos_stock
+            descontar_stock=True,
+        )
