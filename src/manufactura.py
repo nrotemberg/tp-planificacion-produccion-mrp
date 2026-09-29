@@ -19,9 +19,6 @@ class ProcesoManufactura:
         self.tareas.append(tarea)
         return tarea
 
-    def agregar_proceso(self, tarea):
-        return self.agregar_tarea(tarea)
-
     def modificar_proceso(self, tareas):
         if not isinstance(tareas, list):
             raise TipoInvalidoError("Debe recibir una lista de tareas")
