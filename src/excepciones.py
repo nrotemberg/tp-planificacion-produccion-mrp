@@ -4,7 +4,7 @@ class MRPError(Exception):
 
 
 class CantidadInvalidaError(MRPError):
-    """Se levanta cuando una cantidad no es válida."""
+    """Se levanta cuando una cantidad no es válida (debe ser un número entero positivo)."""
     pass
 
 
@@ -95,5 +95,4 @@ __all__ = [
     "HabilidadRequeridaError",
     "RecursosInsuficientesError",
     "PeriodoOcupadoError",
-    "ColaboradorNoDisponibleError",
-]
+    "ColaboradorNoDisponibleError"]

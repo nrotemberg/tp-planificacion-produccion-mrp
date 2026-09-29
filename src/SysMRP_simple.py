@@ -21,7 +21,7 @@ class SistemaMRP:
 
     def crear_orden_fabricacion(self, id, articulo, cantidad, **parametros):
         solicitante = parametros.pop("solicitante", None)
-        solicitud = Solicitud(id, solicitante, "creada", articulo, cantidad, **parametros)
+        solicitud = Solicitud(id, solicitante, articulo, cantidad, **parametros)
         return self.crear_solicitud(solicitud)
 
     def crear_solicitud(self, solicitud):
