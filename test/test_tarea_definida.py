@@ -1,7 +1,12 @@
 import pytest
 
 from src.manufactura import Colaborador, TareaDefinida, UnidadTrabajo
-from src.excepciones import TipoInvalidoError
+from src.excepciones import (
+	CantidadInvalidaError,
+	CostoInvalidoError,
+	ElementoDuplicadoError,
+	TipoInvalidoError,
+)
 
 
 def crear_tarea(
@@ -59,10 +64,70 @@ def test_agregar_subtarea_agrega_y_devuelve_la_subtarea():
 def test_agregar_subtarea_rechaza_valor_nulo():
 	tarea = crear_tarea()
 
-	with pytest.raises(TipoInvalidoError, match="no puede ser nula"):
+	with pytest.raises(TipoInvalidoError, match="instancia de TareaDefinida"):
 		tarea.agregar_subtarea(None)
 
 	assert tarea.subtareas == []
+
+
+def test_agregar_subtarea_rechaza_tipo_invalido():
+	tarea = crear_tarea()
+
+	with pytest.raises(TipoInvalidoError, match="instancia de TareaDefinida"):
+		tarea.agregar_subtarea(object())
+
+	assert tarea.subtareas == []
+
+
+def test_agregar_subtarea_rechaza_la_propia_tarea():
+	tarea = crear_tarea()
+
+	with pytest.raises(TipoInvalidoError, match="no pueden formar ciclos"):
+		tarea.agregar_subtarea(tarea)
+
+	assert tarea.subtareas == []
+
+
+def test_agregar_subtarea_rechaza_subtarea_repetida():
+	tarea = crear_tarea()
+	subtarea = crear_tarea(nombre="Pulido")
+	tarea.agregar_subtarea(subtarea)
+
+	with pytest.raises(ElementoDuplicadoError, match="ya está agregada"):
+		tarea.agregar_subtarea(subtarea)
+
+	assert tarea.subtareas == [subtarea]
+
+
+def test_agregar_subtarea_rechaza_ciclo_indirecto():
+	primera = crear_tarea("Primera")
+	segunda = crear_tarea("Segunda")
+	tercera = crear_tarea("Tercera")
+	primera.agregar_subtarea(segunda)
+	segunda.agregar_subtarea(tercera)
+
+	with pytest.raises(TipoInvalidoError, match="no pueden formar ciclos"):
+		tercera.agregar_subtarea(primera)
+
+	assert tercera.subtareas == []
+
+
+@pytest.mark.parametrize(
+	"parametros, excepcion, mensaje",
+	[
+		(("", 2, None, None, None), TipoInvalidoError, "nombre"),
+		(("Corte", "dos", None, None, None), TipoInvalidoError, "tiempo"),
+		(("Corte", 0, None, None, None), CantidadInvalidaError, "mayor que cero"),
+		(("Corte", 2, object(), None, None), TipoInvalidoError, "UnidadTrabajo"),
+		(("Corte", 2, None, (object(),), None), TipoInvalidoError, "colaboradores"),
+		(("Corte", 2, None, [object()], None), TipoInvalidoError, "Colaborador"),
+		(("Corte", 2, None, None, ("soldadura",)), TipoInvalidoError, "habilidades"),
+		(("Corte", 2, None, None, [""]), TipoInvalidoError, "textos no vacíos"),
+	],
+)
+def test_constructor_rechaza_parametros_invalidos(parametros, excepcion, mensaje):
+	with pytest.raises(excepcion, match=mensaje):
+		TareaDefinida(*parametros)
 
 
 def test_validar_habilidades_devuelve_true_si_estan_cubiertas():
@@ -92,12 +157,20 @@ def test_validar_habilidades_rechaza_un_valor_que_no_sea_lista():
 		tarea.validar_habilidades(None)
 
 
+def test_validar_habilidades_rechaza_colaborador_invalido():
+	tarea = crear_tarea(habilidades_requeridas=["soldadura"])
+
+	with pytest.raises(TipoInvalidoError, match="Todos los colaboradores"):
+		tarea.validar_habilidades([object()])
+
+
 def test_cantidad_colaboradores_suficiente_compara_con_los_requeridos():
 	colaboradores_requeridos = [Colaborador("Ana", 50, []), Colaborador("Luis", 40, [])]
 	tarea = crear_tarea(colaboradores_requeridos=colaboradores_requeridos)
+	colaboradores_disponibles = [Colaborador("Pedro", 30, []), Colaborador("Sofía", 35, [])]
 
-	assert tarea.cantidad_colaboradores_suficiente([object(), object()]) is True
-	assert tarea.cantidad_colaboradores_suficiente([object()]) is False
+	assert tarea.cantidad_colaboradores_suficiente(colaboradores_disponibles) is True
+	assert tarea.cantidad_colaboradores_suficiente([colaboradores_disponibles[0]]) is False
 
 
 def test_cantidad_colaboradores_suficiente_rechaza_un_valor_que_no_sea_lista():
@@ -105,6 +178,14 @@ def test_cantidad_colaboradores_suficiente_rechaza_un_valor_que_no_sea_lista():
 
 	with pytest.raises(TipoInvalidoError, match="deben enviarse en una lista"):
 		tarea.cantidad_colaboradores_suficiente(None)
+
+
+def test_cantidad_colaboradores_suficiente_rechaza_colaboradores_repetidos():
+	colaborador = Colaborador("Ana", 50, [])
+	tarea = crear_tarea(colaboradores_requeridos=[colaborador])
+
+	with pytest.raises(ElementoDuplicadoError, match="colaboradores repetidos"):
+		tarea.cantidad_colaboradores_suficiente([colaborador, colaborador])
 
 
 def test_costo_operativo_suma_costo_fijo_y_colaboradores():
@@ -122,11 +203,21 @@ def test_costo_operativo_suma_costo_fijo_y_colaboradores():
 	assert tarea.costo_operativo() == 450
 
 
-def test_costo_operativo_es_cero_si_no_hay_unidad_de_trabajo():
+def test_costo_operativo_suma_colaboradores_sin_unidad_de_trabajo():
 	colaborador = Colaborador("Ana", 50, [])
 	tarea = crear_tarea(
 		tiempo=2,
 		colaboradores_requeridos=[colaborador],
 	)
 
-	assert tarea.costo_operativo() == 0
+	assert tarea.costo_operativo() == 100
+
+
+def test_costo_operativo_rechaza_costo_fijo_negativo():
+	with pytest.raises(CostoInvalidoError, match="costo fijo"):
+		UnidadTrabajo("Torno", 100, -1, 2)
+
+
+def test_costo_operativo_rechaza_costo_horario_negativo():
+	with pytest.raises(CostoInvalidoError, match="costo por hora"):
+		Colaborador("Ana", -1, [])

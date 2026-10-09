@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from src.manufactura import PeriodoOperacion, UnidadTrabajo
-from src.excepciones import CantidadInvalidaError, TipoInvalidoError
+from src.excepciones import CantidadInvalidaError, CostoInvalidoError, TipoInvalidoError
 
 
 def crear_unidad_trabajo(
@@ -35,6 +35,11 @@ def test_crear_unidad_trabajo_inicializa_sus_atributos():
 	assert unidad.costo_fijo == 300
 	assert unidad.capacidad_colaboradores == 2
 	assert unidad.periodos_ocupados == []
+
+
+def test_crear_unidad_trabajo_rechaza_costo_fijo_negativo():
+	with pytest.raises(CostoInvalidoError, match="costo fijo"):
+		crear_unidad_trabajo(costo_fijo=-1)
 
 
 def test_asignar_periodo_agrega_un_periodo_valido():

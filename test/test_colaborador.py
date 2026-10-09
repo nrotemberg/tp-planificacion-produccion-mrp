@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from src.manufactura import Colaborador, PeriodoOperacion
-from src.excepciones import TipoInvalidoError
+from src.excepciones import CostoInvalidoError, TipoInvalidoError
 
 
 def crear_colaborador(nombre="Ana", costo_por_hora=50, habilidades=None):
@@ -24,6 +24,11 @@ def test_crear_colaborador_inicializa_sus_atributos():
 	assert colaborador.costo_por_hora == 50
 	assert colaborador.habilidades == ["soldadura", "pintura"]
 	assert colaborador.periodos_ocupados == []
+
+
+def test_crear_colaborador_rechaza_costo_por_hora_negativo():
+	with pytest.raises(CostoInvalidoError, match="costo por hora"):
+		crear_colaborador(costo_por_hora=-1)
 
 
 def test_habilidades_nulas_se_inicializan_vacias():
