@@ -117,9 +117,9 @@ def test_no_reservar_dos_veces_la_misma_solicitud():
     assert sistema.inventario.stock[madera]["reservado"] == stock_reservado
     assert solicitud.estado == "planificada"
 
-def test_planificar_es_un_alias_de_reservar_en_el_sistema():
+def test_reservar_recursos_planifica_la_solicitud_en_el_sistema():
     sistema, _, _, _ = crear_sistema()
-    assert sistema.planificar_solicitud(1) is True
+    assert sistema.reservar_recursos(1) is True
 
 def test_iniciar_y_finalizar_produccion_consumen_stock():
     sistema, solicitud, madera, mesa = crear_sistema()
@@ -273,3 +273,52 @@ def test_metodos_rechazan_id_inexistente():
     assert sistema.consumir_stock(99) is False
     assert sistema.iniciar_produccion(99) is False
     assert sistema.finalizar_produccion(99) is False
+
+def test_procesar_solicitudes_respeta_el_orden_fifo():
+    sistema = SistemaMRP()
+    madera = Insumo("Madera", "unidad", 5)
+    mesa = Producto("Mesa", "unidad", 1)
+    mesa.agregar_a_BOM(ComponenteBOM(madera, 1))
+    sistema.agregar_elemento(madera, 10)
+    sistema.agregar_elemento(mesa)
+    sistema.crear_solicitud(Solicitud(1, "Deposito", mesa, 2))
+    sistema.crear_solicitud(Solicitud(2, "Deposito", mesa, 2))
+
+    assert list(sistema.cola_solicitudes) == [1, 2]
+    assert sistema.procesar_siguiente_solicitud() is True
+    assert sistema.obtener_solicitud_por_id(1).estado == "planificada"
+    assert sistema.obtener_solicitud_por_id(2).estado == "creada"
+    assert list(sistema.cola_solicitudes) == [2]
+
+def test_solicitud_no_se_quita_de_la_cola_si_no_puede_planificarse():
+    sistema = SistemaMRP()
+    madera = Insumo("Madera", "unidad", 5)
+    mesa = Producto("Mesa", "unidad", 1)
+    mesa.agregar_a_BOM(ComponenteBOM(madera, 1))
+    sistema.agregar_elemento(madera, 0)
+    sistema.agregar_elemento(mesa)
+    sistema.crear_solicitud(Solicitud(1, "Deposito", mesa, 2))
+
+    assert sistema.procesar_siguiente_solicitud() is False
+    assert list(sistema.cola_solicitudes) == [1]
+    assert sistema.obtener_solicitud_por_id(1).estado == "creada"
+
+def test_guardar_y_cargar_pickle_preserva_el_sistema(tmp_path):
+    sistema, solicitud, madera, mesa = crear_sistema()
+    sistema.reservar_recursos(solicitud.id)
+
+    ruta = tmp_path / "sistema_mrp.pkl"
+    sistema.guardar_pickle(ruta)
+    sistema_recuperado = SistemaMRP.cargar_pickle(ruta)
+
+    assert isinstance(sistema_recuperado, SistemaMRP)
+    assert sistema_recuperado is not sistema
+    assert sistema_recuperado.elementos_produccion.keys() == sistema.elementos_produccion.keys()
+    assert sistema_recuperado.solicitudes[solicitud.id].estado == "planificada"
+    assert sistema_recuperado.inventario.stock[
+        sistema_recuperado.elementos_produccion[madera.nombre]
+    ]["reservado"] == 4
+    assert (
+        sistema_recuperado.solicitudes[solicitud.id].producto
+        is sistema_recuperado.elementos_produccion[mesa.nombre]
+    )

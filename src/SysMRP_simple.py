@@ -1,3 +1,6 @@
+import pickle
+from collections import deque
+
 from src.bom import GestorBOM
 from src.inventario import Inventario
 from src.solicitudes import Solicitud
@@ -9,9 +12,22 @@ class SistemaMRP:
         self.colaboradores = []
         self.unidades_trabajo = []
         self.solicitudes = {}
+        self.cola_solicitudes = deque()
         self.inventario = Inventario()
         self.bom = GestorBOM()
         self.planes_materiales = {}
+
+    def guardar_pickle(self, ruta):
+        with open(ruta, "wb") as archivo:
+            pickle.dump(self, archivo)
+
+    @classmethod
+    def cargar_pickle(cls, ruta):
+        with open(ruta, "rb") as archivo:
+            sistema = pickle.load(archivo)
+        if not isinstance(sistema, cls):
+            raise TypeError("El archivo no contiene un SistemaMRP")
+        return sistema
 
     def agregar_elemento(self, elemento, stock_actual=0, stock_reservado=0):
         if elemento.nombre in self.elementos_produccion:
@@ -29,10 +45,22 @@ class SistemaMRP:
         if self.obtener_solicitud_por_id(solicitud.id) is not None:
             return False
         self.solicitudes[solicitud.id] = solicitud
+        self.cola_solicitudes.append(solicitud.id)
         return True
 
     def obtener_solicitud_por_id(self, id_solicitud):
         return self.solicitudes.get(id_solicitud)
+
+    def procesar_siguiente_solicitud(self):
+        if not self.cola_solicitudes:
+            return False
+
+        id_solicitud = self.cola_solicitudes[0]
+        if not self.reservar_recursos(id_solicitud):
+            return False
+
+        self.cola_solicitudes.popleft()
+        return True
 
     def reservar_recursos(self, id_solicitud):
         """Reserva insumos faltantes y subproductos existentes."""
@@ -73,9 +101,6 @@ class SistemaMRP:
 
     def agregar_unidad_trabajo(self, unidad_trabajo):
         pass
-
-    def planificar_solicitud(self, id_solicitud):
-        return self.reservar_recursos(id_solicitud)
 
     def verificar_stock(self, id_solicitud):
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
