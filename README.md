@@ -40,7 +40,7 @@ La explosión de la BOM se concentra en `bom.py`, dentro de la clase `GestorBOM`
 Su método `explotar` recorre todos los niveles y devuelve un diccionario plano
 de insumos y cantidades requeridas.
 
-`Inventario`, definido en `inventario.py`, utiliza esos requerimientos para verificar, reservar y consumir stock. De esta forma `SistemaMRP` coordina el flujo de la solicitud sin repetir la misma lógica recursiva.
+`Inventario`, definido en `inventario.py`, utiliza esos requerimientos para verificar, reservar y consumir stock. El stock no pertenece a `ElementoProduccion`: se guarda en `Inventario.stock`, usando cada elemento como clave y registrando las cantidades `actual` y `reservado`. `SistemaMRP` carga el stock inicial al agregar cada elemento y coordina el flujo de la solicitud sin repetir la lógica recursiva.
 
 El flujo básico se mantiene:
 

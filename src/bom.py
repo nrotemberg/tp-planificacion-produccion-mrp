@@ -4,7 +4,9 @@ from src.excepciones import BOMCiclicaError
 class GestorBOM:
     """Recorre la BOM de un elemento para calcular materiales o mostrarla."""
 
-    def calcular_requerimientos(self, elemento, cantidad, descontar_stock=False):
+    def calcular_requerimientos(
+        self, elemento, cantidad, descontar_stock=False, inventario=None
+    ):
         """Devuelve (faltantes, disponibles) para fabricar `cantidad`.
 
         `faltantes` son los insumos que hay que conseguir. `disponibles` son
@@ -14,11 +16,15 @@ class GestorBOM:
         Con `descontar_stock=False` el resultado es la BOM completa, sin mirar
         el stock.
         """
+        if descontar_stock and inventario is None:
+            raise ValueError("Se necesita un inventario para descontar stock")
+
         self.faltantes = {}
         self.disponibles = {}
         self.stock_libre = {}
         self.visitados = set()
         self.descontar_stock = descontar_stock
+        self.inventario = inventario
 
         self._recorrer(elemento, cantidad)
         return self.faltantes, self.disponibles
@@ -33,7 +39,7 @@ class GestorBOM:
         if self.descontar_stock and nodo.lista_elementos_bom:
             libre = self.stock_libre.get(nodo)
             if libre is None:
-                libre = max(nodo.stock_total - nodo.stock_reservado, 0)
+                libre = max(self.inventario.stock_libre(nodo), 0)
             usado = min(necesidad, libre)
             self.stock_libre[nodo] = libre - usado
             if usado:

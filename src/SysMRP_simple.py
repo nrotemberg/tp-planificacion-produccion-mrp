@@ -13,10 +13,11 @@ class SistemaMRP:
         self.bom = GestorBOM()
         self.planes_materiales = {}
 
-    def agregar_elemento(self, elemento):
+    def agregar_elemento(self, elemento, stock_actual=0, stock_reservado=0):
         if elemento.nombre in self.elementos_produccion:
             return False
         self.elementos_produccion[elemento.nombre] = elemento
+        self.inventario.registrar(elemento, stock_actual, stock_reservado)
         return True
 
     def crear_orden_fabricacion(self, id, articulo, cantidad, **parametros):
@@ -62,7 +63,7 @@ class SistemaMRP:
         )
         self.inventario.consumir(faltantes)
         self.inventario.consumir(disponibles)
-        solicitud.producto.stock_total += solicitud.cantidad
+        self.inventario.agregar_stock(solicitud.producto, solicitud.cantidad)
         solicitud.cambiar_estado()
         self.planes_materiales.pop(solicitud.id, None)
         return True
@@ -110,4 +111,5 @@ class SistemaMRP:
             solicitud.producto,
             solicitud.cantidad,
             descontar_stock=True,
+            inventario=self.inventario,
         )

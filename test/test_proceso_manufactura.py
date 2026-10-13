@@ -19,7 +19,7 @@ from src.manufactura import (
 
 
 def crear_producto():
-	return Producto("Mesa", "unidad", 0, 0, 1)
+	return Producto("Mesa", "unidad", 1)
 
 
 def crear_tarea(nombre="Corte", costo=0, colaboradores=None, habilidades=None):

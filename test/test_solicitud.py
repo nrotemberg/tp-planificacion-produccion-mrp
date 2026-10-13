@@ -5,8 +5,8 @@ from src.solicitudes import Solicitud
 
 
 def crear_solicitud(cantidad=2):
-    madera = Insumo("Madera", "unidad", 10, 0, 5)
-    mesa = Producto("Mesa", "unidad", 0, 0, 1)
+    madera = Insumo("Madera", "unidad", 5)
+    mesa = Producto("Mesa", "unidad", 1)
     mesa.agregar_a_BOM(ComponenteBOM(madera, 2))
     solicitud = Solicitud(1, "Deposito", mesa, cantidad)
     return solicitud, madera, mesa
@@ -45,6 +45,6 @@ def test_solicitud_finalizada_no_puede_avanzar_mas():
 
 @pytest.mark.parametrize("cantidad", [0, -1, 1.5, "2", None, True])
 def test_solicitud_rechaza_cantidad_invalida(cantidad):
-    producto = Producto("Mesa", "unidad", 0, 0, 1)
+    producto = Producto("Mesa", "unidad", 1)
     with pytest.raises(CantidadInvalidaError):
         Solicitud(1, "Deposito", producto, cantidad)

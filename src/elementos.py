@@ -2,11 +2,9 @@ from src.excepciones import CantidadInvalidaError, CostoInvalidoError, TipoInval
 
 
 class ElementoProduccion:
-    def __init__(self, nombre, unidad_medida, stock_total, stock_reservado, costo):
+    def __init__(self, nombre, unidad_medida, costo):
         self.nombre = nombre
         self.unidad_medida = unidad_medida
-        self.stock_total = stock_total
-        self.stock_reservado = stock_reservado
         self.lista_elementos_bom = []
         self.set_costo(costo)
 
@@ -14,9 +12,6 @@ class ElementoProduccion:
         if not isinstance(nuevo_costo, (int, float)) or nuevo_costo <= 0:
             raise CostoInvalidoError("El costo debe ser mayor a 0")
         self.costo = nuevo_costo
-
-    def hay_stock_suficiente(self, cantidad_requerida):
-        return self.stock_total - self.stock_reservado >= cantidad_requerida
 
     def construir_bom_manual(self, elemento, cantidad):
         self.agregar_a_BOM(ComponenteBOM(elemento, cantidad))
@@ -34,13 +29,6 @@ class ElementoProduccion:
             print(f"{indentacion}  ComponenteBOM(nombre='{elemento.nombre}', cantidad={componente.cantidad})")
             if elemento.lista_elementos_bom:
                 elemento.imprimir_bom(nivel + 2)
-
-    @staticmethod
-    def imprimir_stock(elementos):
-        print("\nNombre       | Cantidad | Reservada")
-        print("-" * 40)
-        for elemento in elementos:
-            print(f"{elemento.nombre:12} | {elemento.stock_total:8} | {elemento.stock_reservado:9}")
 
     def costo_unitario(self):
         return self.costo
