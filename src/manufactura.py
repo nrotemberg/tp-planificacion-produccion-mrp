@@ -54,26 +54,17 @@ class ProcesoManufactura:
         reservas_pendientes = []
         for tarea, periodo in zip(self.tareas, periodos):
             colaboradores = list(tarea.colaboradores_requeridos)
-            if not tarea.validar_habilidades(colaboradores):
-                raise HabilidadRequeridaError(
-                    f"La tarea '{tarea.nombre}' no tiene las habilidades requeridas"
-                )
-            if not tarea.cantidad_colaboradores_suficiente(colaboradores):
-                raise RecursosInsuficientesError(
-                    f"La tarea '{tarea.nombre}' no tiene suficientes colaboradores"
-                )
-            if any(not colaborador.verificar_disponibilidad(periodo) for colaborador in colaboradores):
-                raise ColaboradorNoDisponibleError(
-                    f"No hay colaboradores disponibles para la tarea '{tarea.nombre}'"
-                )
-            if tarea.unidad_trabajo is not None and not tarea.unidad_trabajo.verificar_capacidad(
-                cantidad,
-                periodo=periodo,
-                colaboradores=colaboradores,
-            ):
-                raise RecursosInsuficientesError(
-                    f"La unidad de trabajo no tiene capacidad para la tarea '{tarea.nombre}'"
-                )
+            tarea.validar_colaboradores_requeridos(colaboradores, periodo)
+            if tarea.unidad_trabajo is not None:
+                tarea.validar_unidades_trabajo([tarea.unidad_trabajo], periodo)
+                if not tarea.unidad_trabajo.verificar_capacidad(
+                    cantidad,
+                    periodo=periodo,
+                    colaboradores=colaboradores,
+                ):
+                    raise RecursosInsuficientesError(
+                        f"La unidad de trabajo no tiene capacidad para la tarea '{tarea.nombre}'"
+                    )
             for colaborador in colaboradores:
                 self._validar_conflicto_reserva(
                     colaborador,
@@ -210,6 +201,57 @@ class TareaDefinida:
                 return False
         return True
 
+    def validar_colaboradores_requeridos(self, colaboradores, periodo=None):
+        self._validar_colaboradores(colaboradores)
+        if not self.validar_habilidades(colaboradores):
+            raise HabilidadRequeridaError(
+                f"Los colaboradores asignados no cubren las habilidades requeridas para la tarea '{self.nombre}'"
+            )
+        if not self.cantidad_colaboradores_suficiente(colaboradores):
+            raise RecursosInsuficientesError(
+                f"La tarea '{self.nombre}' no tiene suficientes colaboradores asignados"
+            )
+
+        if periodo is not None:
+            if not isinstance(periodo, PeriodoOperacion):
+                raise TipoInvalidoError("El período debe ser un PeriodoOperacion")
+            for colaborador in colaboradores:
+                if not colaborador.verificar_disponibilidad(periodo):
+                    raise ColaboradorNoDisponibleError(
+                        f"El colaborador '{colaborador.nombre}' no está disponible en el período asignado"
+                    )
+        return True
+
+    def validar_unidades_trabajo(self, unidades_trabajo, periodo=None):
+        if not isinstance(unidades_trabajo, list):
+            raise TipoInvalidoError("Las unidades de trabajo deben enviarse en una lista")
+        if not unidades_trabajo:
+            raise RecursosInsuficientesError("Debe asignarse al menos una unidad de trabajo")
+        if any(not isinstance(unidad, UnidadTrabajo) for unidad in unidades_trabajo):
+            raise TipoInvalidoError("Todas las unidades de trabajo deben ser UnidadTrabajo")
+        if len(set(map(id, unidades_trabajo))) != len(unidades_trabajo):
+            raise ElementoDuplicadoError("La lista no puede contener unidades de trabajo repetidas")
+        if self.unidad_trabajo is None and unidades_trabajo:
+            raise RecursosInsuficientesError(
+                f"La tarea '{self.nombre}' no requiere unidades de trabajo"
+            )
+        if self.unidad_trabajo is not None and any(
+            unidad is not self.unidad_trabajo for unidad in unidades_trabajo
+        ):
+            raise RecursosInsuficientesError(
+                f"La tarea '{self.nombre}' solo puede asignar la unidad de trabajo '{self.unidad_trabajo.nombre}'"
+            )
+
+        if periodo is not None:
+            if not isinstance(periodo, PeriodoOperacion):
+                raise TipoInvalidoError("El período debe ser un PeriodoOperacion")
+            for unidad in unidades_trabajo:
+                if not unidad.verificar_capacidad(cantidad=1, periodo=periodo, colaboradores=None):
+                    raise PeriodoOcupadoError(
+                        f"La unidad de trabajo '{unidad.nombre}' no está disponible en el período asignado"
+                    )
+        return True
+
     def cantidad_colaboradores_suficiente(self, colaboradores):
         self._validar_colaboradores(colaboradores)
         return len(colaboradores) >= len(self.colaboradores_requeridos)
@@ -237,30 +279,207 @@ class TareaDefinida:
 
 class TareaEnCurso:
     ESTADOS_VALIDOS = {"pendiente", "en_curso", "pausada", "finalizada", "cancelada"}
+    TRANSICIONES_VALIDAS = {
+        "pendiente": {"en_curso", "cancelada"},
+        "en_curso": {"pausada", "finalizada", "cancelada"},
+        "pausada": {"en_curso", "cancelada"},
+        "finalizada": set(),
+        "cancelada": set(),
+    }
 
     def __init__(self, nombre, tarea_base, estado):
+        if not isinstance(tarea_base, TareaDefinida):
+            raise TipoInvalidoError("La tarea base debe ser una TareaDefinida")
+
+        if nombre is None:
+            nombre = tarea_base.nombre
+        if not isinstance(nombre, str) or not nombre.strip():
+            raise TipoInvalidoError("El nombre de la tarea en curso debe ser un texto no vacío")
+        if nombre != tarea_base.nombre:
+            raise TipoInvalidoError("El nombre de la tarea en curso debe coincidir con el de la tarea base")
+
+        if estado not in self.ESTADOS_VALIDOS:
+            raise EstadoSolicitudError("Estado no válido")
+
         self.nombre = nombre
         self.tarea_base = tarea_base
         self.estado = estado
         self.colaboradores = []
         self.unidades_trabajo = []
         self.historial_estados = [estado]
+        self._reservas_colaboradores = []
+        self._reservas_unidades = []
 
     def actualizar_estado(self, estado):
         if estado not in self.ESTADOS_VALIDOS:
             raise EstadoSolicitudError("Estado no válido")
+        if estado == self.estado:
+            raise EstadoSolicitudError("Transición de estado no válida")
+        if estado not in self.TRANSICIONES_VALIDAS.get(self.estado, set()):
+            raise EstadoSolicitudError("Transición de estado no válida")
         self.estado = estado
         self.historial_estados.append(estado)
 
-    def asignar_colaboradores(self, colaboradores):
+    def asignar_colaboradores(self, colaboradores, periodo=None):
         if not isinstance(colaboradores, list):
             raise TipoInvalidoError("Los colaboradores deben enviarse en una lista")
-        self.colaboradores = colaboradores
+        if any(not isinstance(colaborador, Colaborador) for colaborador in colaboradores):
+            raise TipoInvalidoError("Todos los colaboradores deben ser Colaborador")
+        if len(set(map(id, colaboradores))) != len(colaboradores):
+            raise ElementoDuplicadoError("La lista no puede contener colaboradores repetidos")
+        if any(colaborador in self.colaboradores for colaborador in colaboradores):
+            raise ElementoDuplicadoError("El colaborador ya está asignado a la tarea")
 
-    def asignar_UTs(self, unidades_trabajo):
+        self.tarea_base.validar_colaboradores_requeridos(colaboradores, periodo)
+
+        if periodo is not None:
+            for colaborador in colaboradores:
+                if not colaborador.verificar_disponibilidad(periodo):
+                    raise ColaboradorNoDisponibleError(
+                        f"El colaborador '{colaborador.nombre}' no está disponible en el período asignado"
+                    )
+
+        asignados = list(self.colaboradores)
+        asignados.extend(colaboradores)
+        self.colaboradores = asignados
+
+        if periodo is not None:
+            for colaborador in colaboradores:
+                colaborador.asignar_periodo(periodo)
+                self._reservas_colaboradores.append((colaborador, periodo))
+
+        return list(self.colaboradores)
+
+    def asignar_UTs(self, unidades_trabajo, periodo=None):
         if not isinstance(unidades_trabajo, list):
             raise TipoInvalidoError("Las unidades de trabajo deben enviarse en una lista")
-        self.unidades_trabajo = unidades_trabajo
+        if any(not isinstance(unidad, UnidadTrabajo) for unidad in unidades_trabajo):
+            raise TipoInvalidoError("Todas las unidades de trabajo deben ser UnidadTrabajo")
+        if len(set(map(id, unidades_trabajo))) != len(unidades_trabajo):
+            raise ElementoDuplicadoError("La lista no puede contener unidades de trabajo repetidas")
+        if any(unidad in self.unidades_trabajo for unidad in unidades_trabajo):
+            raise ElementoDuplicadoError("La unidad de trabajo ya está asignada a la tarea")
+
+        self.tarea_base.validar_unidades_trabajo(unidades_trabajo, periodo)
+
+        if periodo is not None:
+            for unidad in unidades_trabajo:
+                if not unidad.verificar_capacidad(cantidad=1, periodo=periodo, colaboradores=None):
+                    raise PeriodoOcupadoError(
+                        f"La unidad de trabajo '{unidad.nombre}' no está disponible en el período asignado"
+                    )
+
+        asignadas = list(self.unidades_trabajo)
+        asignadas.extend(unidades_trabajo)
+        self.unidades_trabajo = asignadas
+
+        if periodo is not None:
+            for unidad in unidades_trabajo:
+                unidad.asignar_periodo(periodo)
+                self._reservas_unidades.append((unidad, periodo))
+
+        return list(self.unidades_trabajo)
+
+    def liberar_recursos(self, colaboradores=None, unidades_trabajo=None, periodo=None):
+        if colaboradores is None:
+            colaboradores = list(self.colaboradores)
+        if unidades_trabajo is None:
+            unidades_trabajo = list(self.unidades_trabajo)
+
+        if not isinstance(colaboradores, list):
+            raise TipoInvalidoError("Los colaboradores deben enviarse en una lista")
+        if not isinstance(unidades_trabajo, list):
+            raise TipoInvalidoError("Las unidades de trabajo deben enviarse en una lista")
+        if any(not isinstance(colaborador, Colaborador) for colaborador in colaboradores):
+            raise TipoInvalidoError("Todos los colaboradores deben ser Colaborador")
+        if any(not isinstance(unidad, UnidadTrabajo) for unidad in unidades_trabajo):
+            raise TipoInvalidoError("Todas las unidades de trabajo deben ser UnidadTrabajo")
+        if periodo is not None and not isinstance(periodo, PeriodoOperacion):
+            raise TipoInvalidoError("El período debe ser un PeriodoOperacion")
+
+        recursos_liberados = False
+
+        for colaborador in colaboradores:
+            periodos_a_liberar = []
+            if periodo is None:
+                periodos_a_liberar = [reserva_periodo for reserva_colaborador, reserva_periodo in self._reservas_colaboradores if reserva_colaborador is colaborador]
+            else:
+                periodos_a_liberar = [
+                    reserva_periodo
+                    for reserva_colaborador, reserva_periodo in self._reservas_colaboradores
+                    if reserva_colaborador is colaborador and self._mismo_periodo(reserva_periodo, periodo)
+                ]
+
+            if not periodos_a_liberar:
+                continue
+
+            self._reservas_colaboradores = [
+                (reserva_colaborador, reserva_periodo)
+                for reserva_colaborador, reserva_periodo in self._reservas_colaboradores
+                if not (reserva_colaborador is colaborador and any(self._mismo_periodo(reserva_periodo, p) for p in periodos_a_liberar))
+            ]
+            colaborador.periodos_ocupados = [
+                reserva_periodo
+                for reserva_periodo in colaborador.periodos_ocupados
+                if not any(self._mismo_periodo(reserva_periodo, p) for p in periodos_a_liberar)
+            ]
+            self.colaboradores = [item for item in self.colaboradores if item is not colaborador]
+            recursos_liberados = True
+
+        for unidad in unidades_trabajo:
+            periodos_a_liberar = []
+            if periodo is None:
+                periodos_a_liberar = [reserva_periodo for reserva_unidad, reserva_periodo in self._reservas_unidades if reserva_unidad is unidad]
+            else:
+                periodos_a_liberar = [
+                    reserva_periodo
+                    for reserva_unidad, reserva_periodo in self._reservas_unidades
+                    if reserva_unidad is unidad and self._mismo_periodo(reserva_periodo, periodo)
+                ]
+
+            if not periodos_a_liberar:
+                continue
+
+            self._reservas_unidades = [
+                (reserva_unidad, reserva_periodo)
+                for reserva_unidad, reserva_periodo in self._reservas_unidades
+                if not (reserva_unidad is unidad and any(self._mismo_periodo(reserva_periodo, p) for p in periodos_a_liberar))
+            ]
+            unidad.periodos_ocupados = [
+                reserva_periodo
+                for reserva_periodo in unidad.periodos_ocupados
+                if not any(self._mismo_periodo(reserva_periodo, p) for p in periodos_a_liberar)
+            ]
+            self.unidades_trabajo = [item for item in self.unidades_trabajo if item is not unidad]
+            recursos_liberados = True
+
+        if not recursos_liberados:
+            if periodo is not None:
+                raise PeriodoOcupadoError("El período no pertenece a la tarea en curso")
+        return True
+
+    @staticmethod
+    def _mismo_periodo(periodo_1, periodo_2):
+        return periodo_1 is periodo_2 or (
+            isinstance(periodo_1, PeriodoOperacion)
+            and isinstance(periodo_2, PeriodoOperacion)
+            and periodo_1.inicio == periodo_2.inicio
+            and periodo_1.fin == periodo_2.fin
+        )
+
+    def cancelar(self):
+        self.actualizar_estado("cancelada")
+        self.liberar_recursos(colaboradores=list(self.colaboradores), unidades_trabajo=list(self.unidades_trabajo))
+        self.colaboradores = []
+        self.unidades_trabajo = []
+        return self
+
+    def finalizar(self):
+        self.actualizar_estado("finalizada")
+        self.liberar_recursos(colaboradores=list(self.colaboradores), unidades_trabajo=list(self.unidades_trabajo))
+        self.colaboradores = []
+        self.unidades_trabajo = []
+        return self
 
 
 class UnidadTrabajo:
