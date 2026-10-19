@@ -215,8 +215,8 @@ def test_bom_considera_stock_de_subproducto_intermedio():
     faltantes, _ = sistema._obtener_plan_materiales(solicitud)
 
     assert faltantes == {aluminio: 12}
-    assert ranger.lista_elementos_bom == bom_original
-    assert v6.lista_elementos_bom == bom_v6_original
+    assert list(ranger.lista_elementos_bom) == bom_original
+    assert list(v6.lista_elementos_bom) == bom_v6_original
 
 def test_verificar_stock_considera_subproductos_y_requerimientos_netos():
     aluminio = Insumo("Aluminio", "unidad", 5)

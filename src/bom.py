@@ -1,8 +1,15 @@
-from src.excepciones import BOMCiclicaError
+from src.excepciones import BOMCiclicaError, CantidadInvalidaError
 
 
 class GestorBOM:
     """Recorre la BOM de un elemento para calcular materiales o mostrarla."""
+
+    @staticmethod
+    def _validar_cantidad(cantidad):
+        if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad <= 0:
+            raise CantidadInvalidaError(
+                "La cantidad debe ser un número entero positivo"
+            )
 
     def calcular_requerimientos(
         self, elemento, cantidad, descontar_stock=False, inventario=None
@@ -16,6 +23,7 @@ class GestorBOM:
         Con `descontar_stock=False` el resultado es la BOM completa, sin mirar
         el stock.
         """
+        self._validar_cantidad(cantidad)
         if descontar_stock and inventario is None:
             raise ValueError("Se necesita un inventario para descontar stock")
 
@@ -29,6 +37,14 @@ class GestorBOM:
         self._recorrer(elemento, cantidad)
         return self.faltantes, self.disponibles
 
+    def _stock_libre(self, nodo):
+        if self.inventario is None:
+            return 0
+        try:
+            return max(self.inventario.stock_libre(nodo), 0)
+        except KeyError:
+            return 0
+
     def _recorrer(self, nodo, necesidad):
         """Suma a self.faltantes y self.disponibles lo que pide `nodo`.
 
@@ -39,7 +55,7 @@ class GestorBOM:
         if self.descontar_stock and nodo.lista_elementos_bom:
             libre = self.stock_libre.get(nodo)
             if libre is None:
-                libre = max(self.inventario.stock_libre(nodo), 0)
+                libre = self._stock_libre(nodo)
             usado = min(necesidad, libre)
             self.stock_libre[nodo] = libre - usado
             if usado:
@@ -59,12 +75,14 @@ class GestorBOM:
             raise BOMCiclicaError("La BOM contiene un ciclo")
 
         self.visitados.add(nodo)
-        for componente in nodo.lista_elementos_bom:
-            self._recorrer(
-                componente.elemento_produccion,
-                necesidad * componente.cantidad,
-            )
-        self.visitados.remove(nodo)
+        try:
+            for componente in nodo.lista_elementos_bom:
+                self._recorrer(
+                    componente.elemento_produccion,
+                    necesidad * componente.cantidad,
+                )
+        finally:
+            self.visitados.discard(nodo)
 
     def arbol_texto(self, elemento, cantidad=1):
         """Devuelve la BOM completa como un arbol de texto.
@@ -73,9 +91,13 @@ class GestorBOM:
         Por eso aparecen todos los subproductos e insumos, aunque algunos ya
         esten disponibles en stock.
         """
+        self._validar_cantidad(cantidad)
         self.lineas = [f"{elemento.nombre} x {cantidad}"]
         self.visitados = set()
-        self._agregar_lineas(elemento, cantidad, "")
+        try:
+            self._agregar_lineas(elemento, cantidad, "")
+        finally:
+            self.visitados.clear()
         return "\n".join(self.lineas)
 
     def _agregar_lineas(self, nodo, necesidad, prefijo):
@@ -84,19 +106,21 @@ class GestorBOM:
             raise BOMCiclicaError("La BOM contiene un ciclo")
 
         self.visitados.add(nodo)
-        componentes = nodo.lista_elementos_bom
-        for indice, componente in enumerate(componentes):
-            es_ultimo = indice == len(componentes) - 1
-            conector = "`-- " if es_ultimo else "+-- "
-            cantidad_componente = necesidad * componente.cantidad
-            self.lineas.append(
-                f"{prefijo}{conector}"
-                f"{componente.elemento_produccion.nombre} x {cantidad_componente}"
-            )
-            nuevo_prefijo = prefijo + ("    " if es_ultimo else "|   ")
-            self._agregar_lineas(
-                componente.elemento_produccion,
-                cantidad_componente,
-                nuevo_prefijo,
-            )
-        self.visitados.remove(nodo)
+        try:
+            componentes = nodo.lista_elementos_bom
+            for indice, componente in enumerate(componentes):
+                es_ultimo = indice == len(componentes) - 1
+                conector = "`-- " if es_ultimo else "+-- "
+                cantidad_componente = necesidad * componente.cantidad
+                self.lineas.append(
+                    f"{prefijo}{conector}"
+                    f"{componente.elemento_produccion.nombre} x {cantidad_componente}"
+                )
+                nuevo_prefijo = prefijo + ("    " if es_ultimo else "|   ")
+                self._agregar_lineas(
+                    componente.elemento_produccion,
+                    cantidad_componente,
+                    nuevo_prefijo,
+                )
+        finally:
+            self.visitados.discard(nodo)

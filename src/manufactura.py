@@ -18,8 +18,13 @@ class ProcesoManufactura:
     def __init__(self, producto):
         if not isinstance(producto, Producto):
             raise TipoInvalidoError("El producto debe ser una instancia de Producto")
+        if getattr(producto, "proceso_manufactura", None) is not None:
+            raise ElementoDuplicadoError(
+                "El producto ya tiene un proceso de manufactura"
+            )
         self.producto = producto
         self.tareas = []
+        producto.proceso_manufactura = self
 
     def agregar_tarea(self, tarea):
         if not isinstance(tarea, TareaDefinida):

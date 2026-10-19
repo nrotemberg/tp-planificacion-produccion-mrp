@@ -69,7 +69,7 @@ def test_calcular_requerimientos_no_descuenta_stock_si_no_se_pide():
 
 def test_calcular_requerimientos_detecta_ciclo_directo():
     producto = Producto("Producto", "unidad", 1)
-    producto.agregar_a_BOM(ComponenteBOM(producto, 1))
+    producto._lista_elementos_bom.append(ComponenteBOM(producto, 1))
     gestor = GestorBOM()
     with pytest.raises(BOMCiclicaError):
         gestor.calcular_requerimientos(producto, 1)
@@ -77,8 +77,8 @@ def test_calcular_requerimientos_detecta_ciclo_directo():
 def test_calcular_requerimientos_detecta_ciclo_indirecto():
     producto_a = Producto("A", "unidad", 1)
     producto_b = Producto("B", "unidad", 1)
-    producto_a.agregar_a_BOM(ComponenteBOM(producto_b, 1))
-    producto_b.agregar_a_BOM(ComponenteBOM(producto_a, 1))
+    producto_a._lista_elementos_bom.append(ComponenteBOM(producto_b, 1))
+    producto_b._lista_elementos_bom.append(ComponenteBOM(producto_a, 1))
     gestor = GestorBOM()
     with pytest.raises(BOMCiclicaError):
         gestor.calcular_requerimientos(producto_a, 1)

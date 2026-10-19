@@ -1,7 +1,7 @@
 import pytest
 
 from src.elementos import ComponenteBOM, Insumo
-from src.excepciones import CantidadInvalidaError
+from src.excepciones import CantidadInvalidaError, TipoInvalidoError
 
 
 def test_crear_componente_bom():
@@ -10,6 +10,11 @@ def test_crear_componente_bom():
 
     assert componente.elemento_produccion is insumo
     assert componente.cantidad == 3
+
+
+def test_componente_bom_rechaza_elemento_invalido():
+    with pytest.raises(TipoInvalidoError):
+        ComponenteBOM(object(), 3)
 
 
 def test_validar_cantidad_actualiza_cantidad():
