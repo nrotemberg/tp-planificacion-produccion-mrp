@@ -2,7 +2,10 @@ import os
 import sys
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(
+    0,
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+)
 
 from src.SysMRP_simple import SistemaMRP
 from src.elementos import Insumo, Producto
@@ -13,6 +16,17 @@ from src.manufactura import (
     TareaDefinida,
     UnidadTrabajo,
 )
+
+
+def mostrar_stock(sistema):
+    for nombre, elemento in sistema.elementos_produccion.items():
+        stock = sistema.inventario.obtener_stock(elemento)
+        print(
+            f"{nombre}: actual={stock['actual']} "
+            f"reservado={stock['reservado']} "
+            f"libre={sistema.inventario.stock_libre(elemento)} "
+            f"{elemento.unidad_medida}"
+        )
 
 
 def main():
@@ -70,8 +84,20 @@ def main():
 
     # Las tareas describen qué se hace, cuánto demora, qué máquina utiliza,
     # quién la realiza y qué habilidad necesita.
-    corte = TareaDefinida("Corte de componentes", 2, sierra, [carpintero], ["corte"])
-    montaje = TareaDefinida("Armado y fijación", 1.5, banco, [armador], ["armado"])
+    corte = TareaDefinida(
+        "Corte de componentes",
+        2,
+        sierra,
+        [carpintero],
+        ["corte"],
+    )
+    montaje = TareaDefinida(
+        "Armado y fijación",
+        1.5,
+        banco,
+        [armador],
+        ["armado"],
+    )
 
     # El montaje depende del corte: primero se cortan las piezas y después
     # se ensamblan.
@@ -84,65 +110,84 @@ def main():
     # Se asigna un período de trabajo a cada tarea. El segundo período
     # empieza cuando termina el primero para respetar la secuencia.
     periodos = [
-        PeriodoOperacion(datetime(2026, 10, 20, 8), datetime(2026, 10, 20, 10)),
-        PeriodoOperacion(datetime(2026, 10, 20, 10), datetime(2026, 10, 20, 11, 30)),
+        PeriodoOperacion(
+            datetime(2026, 10, 20, 8),
+            datetime(2026, 10, 20, 10),
+        ),
+        PeriodoOperacion(
+            datetime(2026, 10, 20, 10),
+            datetime(2026, 10, 20, 11, 30),
+        ),
     ]
 
     # Se muestra la estructura completa de la mesa y el costo calculado
-    # sumando el costo de todos sus componentes.
-   
+    # sumando los materiales y la manufactura.
     print("BOM mesa")
     print(sistema.bom.arbol_texto(mesa))
-    print(f"\nCosto de materiales por mesa: ${mesa.costo_unitario()}")
+    print(
+        f"\nCosto unitario por mesa: ${mesa.costo_unitario():.2f}"
+    )
 
     # "Actual" es la cantidad física, "reservado" la cantidad asignada a
     # órdenes y "libre" lo que todavía puede utilizarse.
     print("\nStock inicial ")
-    for nombre, elemento in sistema.elementos_produccion.items():
-        stock = sistema.inventario.obtener_stock(elemento)
-        print(
-            f"{nombre}: actual={stock['actual']} "
-            f"reservado={stock['reservado']} "
-            f"libre={sistema.inventario.stock_libre(elemento)} "
-            f"{elemento.unidad_medida}"
-        )
+    mostrar_stock(sistema)
 
     # ---------------------------------------------------------------------
-    # 3. Persistencia y creación de la orden
+    # 4. Creación de la orden
     # ---------------------------------------------------------------------
+    # La orden comienza en estado "creada".
+    if not sistema.crear_orden_fabricacion("SOL-1", mesa, 2):
+        print("\nNo se pudo crear la orden de fabricación.")
+        return
+
+    solicitud = sistema.obtener_solicitud_por_id("SOL-1")
+    print(
+        f"\nid: {solicitud.id}, "
+        f"{solicitud.cantidad} {solicitud.producto.nombre}, "
+        f"Estado: {solicitud.estado}"
+    )
+
+    # ---------------------------------------------------------------------
+    # 5. Planificación de la orden y persistencia
+    # ---------------------------------------------------------------------
+    # Al procesar la orden, el MRP verifica y reserva los materiales.
+    # La orden pasa a estado "planificada".
+    if not sistema.procesar_siguiente_solicitud():
+        print("\nNo se pudo planificar la orden. Revisar materiales.")
+        return
+
+    print(
+        f"\nid: {solicitud.id} Estado: {solicitud.estado} "
+        "(Reserva materiales)\n"
+    )
+
+    # Impresion Materiales
+    mostrar_stock(sistema)
+
     # Se guarda y se vuelve a cargar el sistema para simular que la
     # planificación puede continuarse en otra ejecución del programa.
     sistema.guardar_pickle("sistema_mrp.pkl")
     sistema = SistemaMRP.cargar_pickle("sistema_mrp.pkl")
-    mesa = sistema.elementos_produccion["Mesa"]
 
-    # La orden comienza en estado "creada".
-    sistema.crear_orden_fabricacion("SOL-1", mesa, 2)
     solicitud = sistema.obtener_solicitud_por_id("SOL-1")
-    print(f"\nid: {solicitud.id}, {solicitud.cantidad} {solicitud.producto.nombre}, Estado: {solicitud.estado}")
+    mesa = solicitud.producto
+    proceso = mesa.proceso_manufactura
 
     # ---------------------------------------------------------------------
-    # 4. Planificación de la orden
+    # 6. Inicio de la producción
     # ---------------------------------------------------------------------
-    # Al procesar la orden, el MRP verifica y reserva los materiales.
-    # La orden pasa a estado "planificada".
-    sistema.procesar_siguiente_solicitud()
-    print(f"\nid: {solicitud.id} Estado: {solicitud.estado} (Reserva materiales)\n")
-
-
-    #Impresion Materiales
-    for nombre, elemento in sistema.elementos_produccion.items():
-            stock = sistema.inventario.obtener_stock(elemento)
-            print(
-                f"{nombre}: actual={stock['actual']} "
-                f"reservado={stock['reservado']} "
-                f"libre={sistema.inventario.stock_libre(elemento)} "
-                f"{elemento.unidad_medida}"
-            )
+    # Primero se validan y reservan los recursos de manufactura.
+    tareas = proceso.iniciar_proceso(solicitud.cantidad, periodos)
 
     # La orden pasa a "en curso" y se inicia el proceso de manufactura.
-    sistema.iniciar_produccion("SOL-1")
-    tareas = proceso.iniciar_proceso(solicitud.cantidad, periodos)
+    if not sistema.iniciar_produccion("SOL-1"):
+        for tarea in tareas:
+            tarea.cancelar()
+
+        print("\nNo se pudo iniciar la orden de fabricación.")
+        return
+
     print(f"Estado: {solicitud.estado}")
     print("\nManufactura")
 
@@ -151,6 +196,7 @@ def main():
         f"Cantidad: {solicitud.cantidad}"
     )
     print(f"Costo: ${proceso.calcular_costo_operativo()}")
+
     for tarea, periodo in zip(tareas, periodos):
         unidades = []
         for unidad in tarea.unidades_trabajo:
@@ -160,6 +206,8 @@ def main():
         for colaborador in tarea.colaboradores:
             colaboradores.append(colaborador.nombre)
 
+        tarea.actualizar_estado("en_curso")
+
         print(
             f"Tarea: {tarea.nombre} -- "
             f"UT: {unidades} -- "
@@ -167,9 +215,18 @@ def main():
             f"Período: {periodo.inicio}-{periodo.fin}"
         )
 
+        # Se simula la finalización de cada tarea en secuencia.
+        tarea.finalizar()
+
+    # ---------------------------------------------------------------------
+    # 7. Finalización de la producción
+    # ---------------------------------------------------------------------
     # Al finalizar se consumen los materiales reservados y se agregan
     # las dos mesas terminadas al inventario.
-    sistema.finalizar_produccion("SOL-1")
+    if not sistema.finalizar_produccion("SOL-1"):
+        print("\nNo se pudo finalizar la orden de fabricación.")
+        return
+
     print(f"\n id: {solicitud.id}  Estado: {solicitud.estado}")
     print("\nStock final")
     for nombre, elemento in sistema.elementos_produccion.items():
@@ -178,12 +235,11 @@ def main():
             f"{elemento.unidad_medida}"
         )
 
-    # El costo total combina los materiales de todo el lote y el costo
-    # operativo de las tareas de manufactura.
-    costo_materiales = mesa.costo_unitario() * solicitud.cantidad
-    costo_operativo = proceso.calcular_costo_operativo()
+    # El costo unitario ya incluye materiales y manufactura.
+    # Se multiplica por la cantidad sin volver a sumar el costo operativo.
+    costo_total = mesa.costo_unitario() * solicitud.cantidad
 
-    print(f"\nCosto total: ${costo_materiales + costo_operativo}")
+    print(f"\nCosto total: ${costo_total:.2f}")
 
     # Se conserva el estado final de la orden y del inventario.
     sistema.guardar_pickle("sistema_mrp.pkl")
