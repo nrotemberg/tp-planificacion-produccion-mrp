@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "elementos": [
+    {
+      "id": "madera",
+      "tipo": "insumo",
+      "nombre": "Madera",
+      "unidad_medida": "m2",
+      "costo": 50,
+      "stock_actual": 100
+    },
+    {
+      "id": "mesa",
+      "tipo": "producto",
+      "nombre": "Mesa",
+      "unidad_medida": "unidad",
+      "costo": 1,
+      "stock_actual": 0,
+      "bom": [
+        {
+          "elemento_id": "madera",
+          "cantidad": 6
+        }
+      ]
+    }
+  ],
+  "colaboradores": [
+  {
+    "id": "ana",
+    "nombre": "Ana",
+    "costo_por_hora": 25,
+    "habilidades": ["armado"]
+  }
+],
+ "unidades_trabajo": [
+  {
+    "id": "banco",
+    "nombre": "Banco de armado",
+    "capacidad_max_produccion": 10,
+    "costo_fijo": 80,
+    "capacidad_colaboradores": 2
+  }
+],
+  "procesos": [
+  {
+    "id": "fabricar_mesa",
+    "producto_id": "mesa",
+    "tareas": [
+      {
+        "id": "armado",
+        "nombre": "Armado de mesa",
+        "tiempo": 1.5,
+        "unidad_trabajo_id": "banco",
+        "colaboradores_ids": ["ana"],
+        "habilidades_requeridas": ["armado"],
+        "predecesoras_ids": []
+      }
+    ]
+  }
+],
+  "solicitudes": [
+  {
+    "id": "SOL-1",
+    "producto_id": "mesa",
+    "cantidad": 2,
+    "solicitante": "Depósito",
+    "periodos": [
+      {
+        "tarea_id": "armado",
+        "inicio": "2026-10-26T08:00:00",
+        "fin": "2026-10-26T11:00:00"
+      }
+    ]
+  }
+]
+}

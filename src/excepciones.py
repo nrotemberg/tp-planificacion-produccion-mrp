@@ -72,6 +72,10 @@ class ColaboradorNoDisponibleError(MRPError):
     """Se levanta cuando un colaborador no está disponible en el periodo indicado."""
     pass
 
+class ErrorConfiguracion(MRPError):
+    """Indica que el archivo de configuración no es válido."""
+    pass
+
 
 class SolicitudNoEncontradaErrorConId(SolicitudNoEncontradaError):
     """Error específico para solicitudes inexistentes con detalle del ID."""
@@ -95,4 +99,5 @@ __all__ = [
     "HabilidadRequeridaError",
     "RecursosInsuficientesError",
     "PeriodoOcupadoError",
-    "ColaboradorNoDisponibleError"]
+    "ColaboradorNoDisponibleError", 
+    "ErrorConfiguracion",]
