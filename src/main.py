@@ -15,21 +15,7 @@ from src.manufactura import (
 )
 from src.solicitudes import Solicitud
 
-__all__ = [
-    "ElementoProduccion",
-    "Insumo",
-    "ComponenteBOM",
-    "Producto",
-    "ProcesoManufactura",
-    "TareaDefinida",
-    "TareaEnCurso",
-    "UnidadTrabajo",
-    "Colaborador",
-    "PeriodoOperacion",
-    "Solicitud",
-    "SistemaMRP",
-    "hola_mundo",
-]
+
 
 def mostrar_inventario(sistema):
     print("\nStock final")
