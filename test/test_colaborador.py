@@ -3,7 +3,12 @@ from datetime import datetime
 import pytest
 
 from src.manufactura import Colaborador, PeriodoOperacion
-from src.excepciones import CostoInvalidoError, TipoInvalidoError
+from src.excepciones import (
+	ColaboradorNoDisponibleError,
+	CostoInvalidoError,
+	ElementoDuplicadoError,
+	TipoInvalidoError,
+)
 
 
 def crear_colaborador(nombre="Ana", costo_por_hora=50, habilidades=None):
@@ -31,6 +36,27 @@ def test_crear_colaborador_rechaza_costo_por_hora_negativo():
 		crear_colaborador(costo_por_hora=-1)
 
 
+@pytest.mark.parametrize("nombre", ["", "   ", None, 123])
+def test_crear_colaborador_rechaza_nombre_invalido(nombre):
+	with pytest.raises(TipoInvalidoError, match="nombre"):
+		crear_colaborador(nombre=nombre)
+
+
+@pytest.mark.parametrize("costo", [0, True, float("nan"), float("inf"), "50"])
+def test_crear_colaborador_rechaza_costo_invalido(costo):
+	with pytest.raises(CostoInvalidoError):
+		crear_colaborador(costo_por_hora=costo)
+
+
+@pytest.mark.parametrize(
+	"habilidades",
+	[("soldadura",), [1], [""], ["soldadura", "soldadura"]],
+)
+def test_crear_colaborador_rechaza_habilidades_invalidas(habilidades):
+	with pytest.raises((TipoInvalidoError, ElementoDuplicadoError)):
+		crear_colaborador(habilidades=habilidades)
+
+
 def test_habilidades_nulas_se_inicializan_vacias():
 	colaborador = crear_colaborador(habilidades=None)
 
@@ -50,6 +76,13 @@ def test_tiene_habilidad_devuelve_false_para_habilidad_no_registrada():
 	assert colaborador.tiene_habilidad("mecanizado") is False
 
 
+def test_tiene_habilidad_rechaza_un_nombre_invalido():
+	colaborador = crear_colaborador()
+
+	with pytest.raises(TipoInvalidoError):
+		colaborador.tiene_habilidad(" ")
+
+
 def test_asignar_periodo_agrega_un_periodo_valido():
 	colaborador = crear_colaborador()
 	periodo = crear_periodo(8, 10)
@@ -66,6 +99,31 @@ def test_asignar_periodo_rechaza_un_valor_invalido():
 		colaborador.asignar_periodo("08:00-10:00")
 
 	assert colaborador.periodos_ocupados == []
+
+
+def test_asignar_periodo_rechaza_solapamiento_sin_modificar_reservas():
+	colaborador = crear_colaborador()
+	periodo = crear_periodo(8, 10)
+	colaborador.asignar_periodo(periodo)
+
+	with pytest.raises(ColaboradorNoDisponibleError):
+		colaborador.asignar_periodo(crear_periodo(9, 11))
+
+	assert colaborador.periodos_ocupados == [periodo]
+
+
+def test_agregar_y_quitar_habilidad_validan_y_modifican_la_lista():
+	colaborador = crear_colaborador(habilidades=["soldadura"])
+
+	assert colaborador.agregar_habilidad("pintura") is True
+	assert colaborador.habilidades == ["soldadura", "pintura"]
+	assert colaborador.quitar_habilidad("pintura") is True
+	assert colaborador.quitar_habilidad("pintura") is False
+
+	with pytest.raises(ElementoDuplicadoError):
+		colaborador.agregar_habilidad("soldadura")
+	with pytest.raises(TipoInvalidoError):
+		colaborador.agregar_habilidad(" ")
 
 
 def test_verificar_disponibilidad_es_true_sin_periodos_ocupados():

@@ -22,7 +22,7 @@ def crear_producto():
 	return Producto("Mesa", "unidad", 1)
 
 
-def crear_tarea(nombre="Corte", costo=0, colaboradores=None, habilidades=None):
+def crear_tarea(nombre="Corte", costo=1, colaboradores=None, habilidades=None):
 	return TareaDefinida(
 		nombre,
 		1,
@@ -132,10 +132,10 @@ def test_modificar_proceso_rechaza_tareas_repetidas():
 def test_calcular_costo_operativo_suma_el_costo_de_todas_las_tareas():
 	proceso = ProcesoManufactura(crear_producto())
 	proceso.modificar_proceso(
-		[crear_tarea("Corte", 125), crear_tarea("Pulido", 75), crear_tarea("Pintura", 0)]
+		[crear_tarea("Corte", 125), crear_tarea("Pulido", 75), crear_tarea("Pintura", 1)]
 	)
 
-	assert proceso.calcular_costo_operativo() == 200
+	assert proceso.calcular_costo_operativo() == 201
 
 
 def test_calcular_costo_operativo_de_un_proceso_sin_tareas_es_cero():

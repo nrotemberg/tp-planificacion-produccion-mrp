@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -40,6 +40,24 @@ def test_crear_periodo_rechaza_fin_que_no_sea_datetime():
 def test_crear_periodo_rechaza_fin_igual_o_anterior_al_inicio(inicio, fin):
 	with pytest.raises(PeriodoOcupadoError, match="fecha fin debe ser posterior"):
 		PeriodoOperacion(inicio, fin)
+
+
+def test_crear_periodo_rechaza_mezcla_de_datetimes_con_y_sin_zona_horaria():
+	inicio = crear_datetime(8)
+	fin = datetime(2026, 9, 22, 10, tzinfo=timezone.utc)
+
+	with pytest.raises(TipoInvalidoError, match="mismo tipo de zona horaria"):
+		PeriodoOperacion(inicio, fin)
+
+
+def test_crear_periodo_acepta_datetimes_con_la_misma_zona_horaria():
+	inicio = datetime(2026, 9, 22, 8, tzinfo=timezone.utc)
+	fin = datetime(2026, 9, 22, 10, tzinfo=timezone.utc)
+
+	periodo = PeriodoOperacion(inicio, fin)
+
+	assert periodo.duracion_horas() == 2
+
 
 def test_duracion_horas_devuelve_la_duracion_completa():
 	periodo = PeriodoOperacion(crear_datetime(8, 30), crear_datetime(11))

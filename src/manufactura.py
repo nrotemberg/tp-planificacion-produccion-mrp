@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 
 from src.elementos import Producto
@@ -498,12 +499,30 @@ class TareaEnCurso:
 
 class UnidadTrabajo:
     def __init__(self, nombre, capacidad_max_produccion, costo_fijo, capacidad_colaboradores):
+        self._validar_nombre(nombre, "El nombre de la unidad de trabajo")
+        self._validar_numero_positivo(
+            capacidad_max_produccion,
+            "La capacidad máxima de producción debe ser numérica y mayor que cero",
+            CantidadInvalidaError,
+            TipoInvalidoError,
+        )
+        self._validar_numero_positivo(
+            costo_fijo,
+            "El costo fijo debe ser numérico y mayor que cero",
+            CostoInvalidoError,
+        )
         if (
-            isinstance(costo_fijo, bool)
-            or not isinstance(costo_fijo, (int, float))
-            or costo_fijo < 0
+            isinstance(capacidad_colaboradores, bool)
+            or not isinstance(capacidad_colaboradores, int)
         ):
-            raise CostoInvalidoError("El costo fijo debe ser numérico y no negativo")
+            raise TipoInvalidoError(
+                "La capacidad de colaboradores debe ser un entero"
+            )
+        if capacidad_colaboradores < 0:
+            raise CantidadInvalidaError(
+                "La capacidad de colaboradores no puede ser negativa"
+            )
+
         self.nombre = nombre
         self.capacidad_max_produccion = capacidad_max_produccion
         self.costo_fijo = costo_fijo
@@ -513,10 +532,19 @@ class UnidadTrabajo:
     def asignar_periodo(self, periodo):
         if not isinstance(periodo, PeriodoOperacion):
             raise TipoInvalidoError("Debe asignarse un PeriodoOperacion")
+        if any(periodo.se_solapa_con(ocupado) for ocupado in self.periodos_ocupados):
+            raise PeriodoOcupadoError(
+                f"La unidad de trabajo '{self.nombre}' ya está ocupada en el período"
+            )
         self.periodos_ocupados.append(periodo)
 
     def verificar_capacidad(self, cantidad, periodo=None, colaboradores=None):
-        if cantidad <= 0:
+        if (
+            isinstance(cantidad, bool)
+            or not isinstance(cantidad, (int, float))
+            or not math.isfinite(cantidad)
+            or cantidad <= 0
+        ):
             raise CantidadInvalidaError("La cantidad debe ser mayor que cero")
 
         if cantidad > self.capacidad_max_produccion:
@@ -525,36 +553,90 @@ class UnidadTrabajo:
         if colaboradores is not None:
             if not isinstance(colaboradores, list):
                 raise TipoInvalidoError("Los colaboradores deben enviarse en una lista")
+            if any(not isinstance(colaborador, Colaborador) for colaborador in colaboradores):
+                raise TipoInvalidoError(
+                    "Todos los colaboradores deben ser Colaborador"
+                )
+            if len(set(map(id, colaboradores))) != len(colaboradores):
+                raise ElementoDuplicadoError(
+                    "La lista no puede contener colaboradores repetidos"
+                )
             if len(colaboradores) > self.capacidad_colaboradores:
                 return False
 
         if periodo is not None:
+            if not isinstance(periodo, PeriodoOperacion):
+                raise TipoInvalidoError("El período debe ser un PeriodoOperacion")
             for periodo_ocupado in self.periodos_ocupados:
                 if periodo.se_solapa_con(periodo_ocupado):
                     return False
 
         return True
 
+    @staticmethod
+    def _validar_nombre(nombre, campo):
+        if not isinstance(nombre, str) or not nombre.strip():
+            raise TipoInvalidoError(f"{campo} debe ser un texto no vacío")
+
+    @staticmethod
+    def _validar_numero_positivo(valor, mensaje, excepcion, excepcion_tipo=None):
+        if (
+            isinstance(valor, bool)
+            or not isinstance(valor, (int, float))
+            or (isinstance(valor, float) and not math.isfinite(valor))
+        ):
+            if excepcion_tipo is not None:
+                raise excepcion_tipo(mensaje)
+            raise excepcion(mensaje)
+        if valor <= 0:
+            raise excepcion(mensaje)
+
 
 class Colaborador:
     def __init__(self, nombre, costo_por_hora, habilidades):
+        self._validar_nombre(nombre)
         if (
             isinstance(costo_por_hora, bool)
             or not isinstance(costo_por_hora, (int, float))
-            or costo_por_hora < 0
+            or not math.isfinite(costo_por_hora)
+            or costo_por_hora <= 0
         ):
-            raise CostoInvalidoError("El costo por hora debe ser numérico y no negativo")
+            raise CostoInvalidoError(
+                "El costo por hora debe ser numérico y mayor que cero"
+            )
+        self._validar_habilidades(habilidades)
         self.nombre = nombre
         self.costo_por_hora = costo_por_hora
-        self.habilidades = habilidades or []
+        self.habilidades = list(habilidades or [])
         self.periodos_ocupados = []
 
     def tiene_habilidad(self, habilidad):
+        self._validar_habilidad(habilidad)
         return habilidad in self.habilidades
+
+    def agregar_habilidad(self, habilidad):
+        self._validar_habilidad(habilidad)
+        if habilidad in self.habilidades:
+            raise ElementoDuplicadoError(
+                f"La habilidad '{habilidad}' ya está registrada"
+            )
+        self.habilidades.append(habilidad)
+        return True
+
+    def quitar_habilidad(self, habilidad):
+        self._validar_habilidad(habilidad)
+        if habilidad not in self.habilidades:
+            return False
+        self.habilidades.remove(habilidad)
+        return True
 
     def asignar_periodo(self, periodo):
         if not isinstance(periodo, PeriodoOperacion):
             raise TipoInvalidoError("Debe asignarse un PeriodoOperacion")
+        if not self.verificar_disponibilidad(periodo):
+            raise ColaboradorNoDisponibleError(
+                f"El colaborador '{self.nombre}' no está disponible en el período"
+            )
         self.periodos_ocupados.append(periodo)
 
     def verificar_disponibilidad(self, periodo):
@@ -566,11 +648,44 @@ class Colaborador:
                 return False
         return True
 
+    @staticmethod
+    def _validar_nombre(nombre):
+        if not isinstance(nombre, str) or not nombre.strip():
+            raise TipoInvalidoError(
+                "El nombre del colaborador debe ser un texto no vacío"
+            )
+
+    @classmethod
+    def _validar_habilidades(cls, habilidades):
+        if habilidades is None:
+            return
+        if not isinstance(habilidades, list):
+            raise TipoInvalidoError(
+                "Las habilidades deben enviarse en una lista"
+            )
+        for habilidad in habilidades:
+            cls._validar_habilidad(habilidad)
+        if len(set(habilidades)) != len(habilidades):
+            raise ElementoDuplicadoError(
+                "La lista no puede contener habilidades repetidas"
+            )
+
+    @staticmethod
+    def _validar_habilidad(habilidad):
+        if not isinstance(habilidad, str) or not habilidad.strip():
+            raise TipoInvalidoError(
+                "Cada habilidad debe ser un texto no vacío"
+            )
+
 
 class PeriodoOperacion:
     def __init__(self, inicio, fin):
         if not isinstance(inicio, datetime) or not isinstance(fin, datetime):
             raise TipoInvalidoError("Inicio y fin deben ser datetime")
+        if self._tiene_zona_horaria(inicio) != self._tiene_zona_horaria(fin):
+            raise TipoInvalidoError(
+                "Inicio y fin deben tener el mismo tipo de zona horaria"
+            )
         if fin <= inicio:
             raise PeriodoOcupadoError("La fecha fin debe ser posterior a la fecha inicio")
         self.inicio = inicio
@@ -584,3 +699,7 @@ class PeriodoOperacion:
         if not isinstance(otro, PeriodoOperacion):
             raise TipoInvalidoError("Debe compararse con otro PeriodoOperacion")
         return not (self.fin <= otro.inicio or otro.fin <= self.inicio)
+
+    @staticmethod
+    def _tiene_zona_horaria(valor):
+        return valor.tzinfo is not None and valor.utcoffset() is not None
