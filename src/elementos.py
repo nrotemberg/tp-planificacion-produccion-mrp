@@ -1,11 +1,11 @@
 import math
 
 from src.excepciones import (
-    BOMCiclicaError,
     CantidadInvalidaError,
     CostoInvalidoError,
     TipoInvalidoError,
 )
+from src.bom import GestorBOM
 
 
 class ElementoProduccion:
@@ -44,18 +44,11 @@ class ElementoProduccion:
     def agregar_a_BOM(self, componente):
         if not isinstance(componente, ComponenteBOM):
             raise TipoInvalidoError("El componente debe ser una instancia de ComponenteBOM")
-        elemento = componente.elemento_produccion
-        if (
-            self.detectar_ciclo()
-            or elemento.detectar_ciclo()
-            or self._alcanza(elemento, self, set())
-        ):
-            raise BOMCiclicaError("La BOM contiene un ciclo")
+        GestorBOM.validar_agregado(self, componente)
         self._lista_elementos_bom.append(componente)
 
     def imprimir_bom(self, nivel=0):
-        if self.detectar_ciclo():
-            raise BOMCiclicaError("La BOM contiene un ciclo")
+        GestorBOM.validar_sin_ciclos(self)
 
         indentacion = "  " * nivel
         print(f"{indentacion}{self.nombre}")
@@ -65,40 +58,8 @@ class ElementoProduccion:
             if elemento.lista_elementos_bom:
                 elemento.imprimir_bom(nivel + 2)
 
-    @staticmethod
-    def _alcanza(elemento, objetivo, visitados):
-        if elemento is objetivo:
-            return True
-        if elemento in visitados:
-            return False
-
-        visitados.add(elemento)
-        return any(
-            ElementoProduccion._alcanza(
-                componente.elemento_produccion, objetivo, visitados
-            )
-            for componente in elemento.lista_elementos_bom
-        )
-
-    @staticmethod
-    def _tiene_ciclo(elemento, en_recorrido, visitados):
-        if elemento in en_recorrido:
-            return True
-        if elemento in visitados:
-            return False
-
-        en_recorrido.add(elemento)
-        for componente in elemento.lista_elementos_bom:
-            if ElementoProduccion._tiene_ciclo(
-                componente.elemento_produccion, en_recorrido, visitados
-            ):
-                return True
-        en_recorrido.remove(elemento)
-        visitados.add(elemento)
-        return False
-
     def detectar_ciclo(self):
-        return self._tiene_ciclo(self, set(), set())
+        return GestorBOM.detectar_ciclo(self)
 
     def costo_unitario(self):
         return self.costo
@@ -137,8 +98,7 @@ class Producto(ElementoProduccion):
         self.proceso_manufactura = None
 
     def costo_unitario(self):
-        if self.detectar_ciclo():
-            raise BOMCiclicaError("La BOM contiene un ciclo")
+        GestorBOM.validar_sin_ciclos(self)
 
         costo_materiales = 0
         for componente in self.lista_elementos_bom:

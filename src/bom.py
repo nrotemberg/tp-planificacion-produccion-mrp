@@ -5,6 +5,58 @@ class GestorBOM:
     """Recorre la BOM de un elemento para calcular materiales o mostrarla."""
 
     @staticmethod
+    def validar_agregado(elemento, componente):
+        """Rechaza componentes que vuelvan cíclica la BOM de `elemento`."""
+        subelemento = componente.elemento_produccion
+        GestorBOM.validar_sin_ciclos(elemento)
+        GestorBOM.validar_sin_ciclos(subelemento)
+        if GestorBOM._alcanza(subelemento, elemento, set()):
+            raise BOMCiclicaError("La BOM contiene un ciclo")
+
+    @staticmethod
+    def validar_sin_ciclos(elemento):
+        """Lanza BOMCiclicaError si el elemento tiene una BOM cíclica."""
+        if GestorBOM.detectar_ciclo(elemento):
+            raise BOMCiclicaError("La BOM contiene un ciclo")
+
+    @staticmethod
+    def detectar_ciclo(elemento):
+        """Indica si la BOM contiene un ciclo directo o indirecto."""
+        return GestorBOM._tiene_ciclo(elemento, set(), set())
+
+    @staticmethod
+    def _alcanza(elemento, objetivo, visitados):
+        if elemento is objetivo:
+            return True
+        if elemento in visitados:
+            return False
+
+        visitados.add(elemento)
+        return any(
+            GestorBOM._alcanza(
+                componente.elemento_produccion, objetivo, visitados
+            )
+            for componente in elemento.lista_elementos_bom
+        )
+
+    @staticmethod
+    def _tiene_ciclo(elemento, en_recorrido, visitados):
+        if elemento in en_recorrido:
+            return True
+        if elemento in visitados:
+            return False
+
+        en_recorrido.add(elemento)
+        for componente in elemento.lista_elementos_bom:
+            if GestorBOM._tiene_ciclo(
+                componente.elemento_produccion, en_recorrido, visitados
+            ):
+                return True
+        en_recorrido.remove(elemento)
+        visitados.add(elemento)
+        return False
+
+    @staticmethod
     def _validar_cantidad(cantidad):
         if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad <= 0:
             raise CantidadInvalidaError(
