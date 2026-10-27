@@ -50,6 +50,12 @@ creada -> planificada -> en curso -> finalizada
 
 Una solicitud sólo reserva materiales cuando está creada, sólo inicia producción cuando está planificada y sólo consume stock cuando está en curso.
 
+Al cargar una programación desde JSON, cada período debe cubrir el tiempo
+necesario para la cantidad solicitada. Además, una tarea no puede comenzar
+antes de que terminen sus predecesoras y los colaboradores o unidades de
+trabajo no pueden quedar asignados a períodos superpuestos, ni dentro de un
+proceso ni entre solicitudes programadas.
+
 
 ## Reglas de Negocio Clave
 
