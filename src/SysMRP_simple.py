@@ -1,6 +1,7 @@
 import pickle
 from collections import deque
-
+from src.manufactura import Colaborador, UnidadTrabajo, PeriodoOperacion
+from src.excepciones import EstadoSolicitudError, TipoInvalidoError
 from src.bom import GestorBOM
 from src.inventario import Inventario
 from src.solicitudes import Solicitud
@@ -16,6 +17,7 @@ class SistemaMRP:
         self.inventario = Inventario()
         self.bom = GestorBOM()
         self.planes_materiales = {}
+        self._periodos_solicitudes = {}
 
     def guardar_pickle(self, ruta):
         with open(ruta, "wb") as archivo:
@@ -97,10 +99,28 @@ class SistemaMRP:
         return True
 
     def agregar_colaborador(self, colaborador):
-        pass
+        """Registra un colaborador y evita agregar dos veces el mismo objeto."""
+        if not isinstance(colaborador, Colaborador):
+            raise TipoInvalidoError("El colaborador debe ser una instancia de Colaborador")
+
+        if colaborador in self.colaboradores:
+            return False
+
+        self.colaboradores.append(colaborador)
+        return True
+
 
     def agregar_unidad_trabajo(self, unidad_trabajo):
-        pass
+        """Registra una unidad de trabajo y evita duplicar el mismo objeto."""
+        if not isinstance(unidad_trabajo, UnidadTrabajo):
+            raise TipoInvalidoError("La unidad de trabajo debe ser una instancia de UnidadTrabajo")
+
+        if unidad_trabajo in self.unidades_trabajo:
+            return False
+
+        self.unidades_trabajo.append(unidad_trabajo)
+        return True
+
 
     def verificar_stock(self, id_solicitud):
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
@@ -117,6 +137,71 @@ class SistemaMRP:
             return False
         solicitud.cambiar_estado()
         return True
+#Desde aca
+    def programar_solicitud(self, id_solicitud, periodos):
+        """Asocia los períodos de trabajo a una solicitud creada."""
+        solicitud = self.obtener_solicitud_por_id(id_solicitud)
+
+        if solicitud is None:
+            raise EstadoSolicitudError(
+                f"No existe la solicitud '{id_solicitud}'"
+            )
+
+        if solicitud.estado != "creada":
+            raise EstadoSolicitudError(
+                "Solo se puede programar una solicitud creada"
+            )
+
+        proceso = getattr(
+            solicitud.producto,
+            "proceso_manufactura",
+            None,
+        )
+
+        if proceso is None:
+            raise EstadoSolicitudError(
+                "El producto no tiene un proceso de manufactura"
+            )
+
+        if not isinstance(periodos, list) or any(
+            not isinstance(periodo, PeriodoOperacion)
+            for periodo in periodos
+        ):
+            raise TipoInvalidoError(
+                "Los períodos deben ser una lista de PeriodoOperacion"
+            )
+
+        if not proceso.tareas:
+            raise EstadoSolicitudError(
+                "El proceso de manufactura no tiene tareas"
+            )
+
+        if len(periodos) != len(proceso.tareas):
+            raise EstadoSolicitudError(
+                "Debe existir un período por cada tarea del proceso"
+            )
+
+        for tarea, periodo in zip(proceso.tareas, periodos):
+            horas_necesarias = tarea.tiempo * solicitud.cantidad
+
+            if periodo.duracion_horas() < horas_necesarias:
+                raise EstadoSolicitudError(
+                    f"El período de '{tarea.nombre}' debe cubrir "
+                    f"al menos {horas_necesarias} horas"
+                )
+
+        # Se guarda después de validar todos los períodos.
+        self._periodos_solicitudes[id_solicitud] = tuple(periodos)
+
+    def obtener_periodos_solicitud(self, id_solicitud):
+        """Devuelve los períodos programados como una tupla."""
+        return self._periodos_solicitudes.get(id_solicitud, ())
+
+    def obtener_periodos_solicitud(self, id_solicitud):
+        """Devuelve los períodos programados como una tupla."""
+        return self._periodos_solicitudes.get(id_solicitud, ())
+
+#Hasta aca
 
     def finalizar_produccion(self, id_solicitud):
         return self.consumir_stock(id_solicitud)

@@ -94,16 +94,25 @@ class ProcesoManufactura:
                 reservas_pendientes.append((tarea.unidad_trabajo, periodo))
 
         tareas_en_curso = []
-        for tarea, periodo, colaboradores in asignaciones:
-            if tarea.unidad_trabajo is not None:
-                tarea.unidad_trabajo.asignar_periodo(periodo)
-            for colaborador in colaboradores:
-                colaborador.asignar_periodo(periodo)
 
-            tarea_en_curso = TareaEnCurso(tarea.nombre, tarea, "pendiente")
-            tarea_en_curso.asignar_colaboradores(colaboradores)
+        for tarea, periodo, colaboradores in asignaciones:
+            tarea_en_curso = TareaEnCurso(
+                tarea.nombre,
+                tarea,
+                "pendiente",
+            )
+
+            tarea_en_curso.asignar_colaboradores(
+                colaboradores,
+                periodo,
+            )
+
             if tarea.unidad_trabajo is not None:
-                tarea_en_curso.asignar_UTs([tarea.unidad_trabajo])
+                tarea_en_curso.asignar_UTs(
+                    [tarea.unidad_trabajo],
+                    periodo,
+                )
+
             tareas_en_curso.append(tarea_en_curso)
 
         return tareas_en_curso
