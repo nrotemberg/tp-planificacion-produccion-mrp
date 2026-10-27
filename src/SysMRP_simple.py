@@ -1,5 +1,5 @@
 import pickle
-from collections import deque
+from src.clases_auxiliares import ColaFIFO
 from src.manufactura import Colaborador, UnidadTrabajo, PeriodoOperacion
 from src.excepciones import EstadoSolicitudError, TipoInvalidoError
 from src.bom import GestorBOM
@@ -13,7 +13,7 @@ class SistemaMRP:
         self.colaboradores = []
         self.unidades_trabajo = []
         self.solicitudes = {}
-        self.cola_solicitudes = deque()
+        self.cola_solicitudes = ColaFIFO()
         self.inventario = Inventario()
         self.bom = GestorBOM()
         self.planes_materiales = {}
@@ -47,7 +47,7 @@ class SistemaMRP:
         if self.obtener_solicitud_por_id(solicitud.id) is not None:
             return False
         self.solicitudes[solicitud.id] = solicitud
-        self.cola_solicitudes.append(solicitud.id)
+        self.cola_solicitudes.encolar(solicitud.id)
         return True
 
     def obtener_solicitud_por_id(self, id_solicitud):
@@ -57,11 +57,11 @@ class SistemaMRP:
         if not self.cola_solicitudes:
             return False
 
-        id_solicitud = self.cola_solicitudes[0]
+        id_solicitud = self.cola_solicitudes.ver_primero()
         if not self.reservar_recursos(id_solicitud):
             return False
 
-        self.cola_solicitudes.popleft()
+        self.cola_solicitudes.desencolar()
         return True
 
     def reservar_recursos(self, id_solicitud):
@@ -190,6 +190,16 @@ class SistemaMRP:
                     f"al menos {horas_necesarias} horas"
                 )
 
+        proceso.validar_recursos_programados(
+            solicitud.cantidad,
+            periodos,
+        )
+        self._validar_conflictos_programacion(
+            id_solicitud,
+            proceso.tareas,
+            periodos,
+        )
+
         # Se guarda después de validar todos los períodos.
         self._periodos_solicitudes[id_solicitud] = tuple(periodos)
 
@@ -197,9 +207,55 @@ class SistemaMRP:
         """Devuelve los períodos programados como una tupla."""
         return self._periodos_solicitudes.get(id_solicitud, ())
 
-    def obtener_periodos_solicitud(self, id_solicitud):
-        """Devuelve los períodos programados como una tupla."""
-        return self._periodos_solicitudes.get(id_solicitud, ())
+    def _validar_conflictos_programacion(
+        self,
+        id_solicitud,
+        tareas,
+        periodos,
+    ):
+        for otro_id, otros_periodos in self._periodos_solicitudes.items():
+            if otro_id == id_solicitud:
+                continue
+
+            otra_solicitud = self.obtener_solicitud_por_id(otro_id)
+            otro_proceso = getattr(
+                otra_solicitud.producto,
+                "proceso_manufactura",
+                None,
+            )
+
+            if otro_proceso is None:
+                continue
+
+            for tarea, periodo in zip(tareas, periodos):
+                for otra_tarea, otro_periodo in zip(
+                    otro_proceso.tareas,
+                    otros_periodos,
+                ):
+                    if not periodo.se_solapa_con(otro_periodo):
+                        continue
+
+                    if (
+                        tarea.unidad_trabajo is not None
+                        and tarea.unidad_trabajo is otra_tarea.unidad_trabajo
+                    ):
+                        raise EstadoSolicitudError(
+                            f"La unidad de trabajo "
+                            f"'{tarea.unidad_trabajo.nombre}' ya está "
+                            "programada en un período superpuesto"
+                        )
+
+                    colaboradores_comunes = [
+                        colaborador
+                        for colaborador in tarea.colaboradores_requeridos
+                        if colaborador in otra_tarea.colaboradores_requeridos
+                    ]
+                    if colaboradores_comunes:
+                        colaborador = next(iter(colaboradores_comunes))
+                        raise EstadoSolicitudError(
+                            f"El colaborador '{colaborador.nombre}' ya está "
+                            "programado en un período superpuesto"
+                        )
 
 #Hasta aca
 

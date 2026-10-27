@@ -44,6 +44,34 @@ class ProcesoManufactura:
         return list(self.tareas)
 
     def iniciar_proceso(self, cantidad, periodos):
+        asignaciones = self.validar_recursos_programados(cantidad, periodos)
+
+        tareas_en_curso = []
+
+        for tarea, periodo, colaboradores in asignaciones:
+            tarea_en_curso = TareaEnCurso(
+                tarea.nombre,
+                tarea,
+                "pendiente",
+            )
+
+            tarea_en_curso.asignar_colaboradores(
+                colaboradores,
+                periodo,
+            )
+
+            if tarea.unidad_trabajo is not None:
+                tarea_en_curso.asignar_UTs(
+                    [tarea.unidad_trabajo],
+                    periodo,
+                )
+
+            tareas_en_curso.append(tarea_en_curso)
+
+        return tareas_en_curso
+
+    def validar_recursos_programados(self, cantidad, periodos):
+        """Valida dependencias temporales y recursos sin reservarlos."""
         if cantidad <= 0:
             raise CantidadInvalidaError("La cantidad debe ser mayor que cero")
         if not isinstance(periodos, list):
@@ -55,6 +83,15 @@ class ProcesoManufactura:
 
         posiciones = {id(tarea): posicion for posicion, tarea in enumerate(self.tareas)}
         self._validar_dependencias(posiciones)
+
+        periodos_por_tarea = dict(zip(self.tareas, periodos))
+        for tarea in self.tareas:
+            for subtarea in tarea.subtareas:
+                if periodos_por_tarea[subtarea].fin > periodos_por_tarea[tarea].inicio:
+                    raise EstadoSolicitudError(
+                        f"La tarea '{tarea.nombre}' no puede iniciar antes "
+                        f"de que finalice su predecesora '{subtarea.nombre}'"
+                    )
 
         asignaciones = []
         reservas_pendientes = []
@@ -94,29 +131,7 @@ class ProcesoManufactura:
             if tarea.unidad_trabajo is not None:
                 reservas_pendientes.append((tarea.unidad_trabajo, periodo))
 
-        tareas_en_curso = []
-
-        for tarea, periodo, colaboradores in asignaciones:
-            tarea_en_curso = TareaEnCurso(
-                tarea.nombre,
-                tarea,
-                "pendiente",
-            )
-
-            tarea_en_curso.asignar_colaboradores(
-                colaboradores,
-                periodo,
-            )
-
-            if tarea.unidad_trabajo is not None:
-                tarea_en_curso.asignar_UTs(
-                    [tarea.unidad_trabajo],
-                    periodo,
-                )
-
-            tareas_en_curso.append(tarea_en_curso)
-
-        return tareas_en_curso
+        return asignaciones
 
     def _validar_dependencias(self, posiciones):
         estados = {}

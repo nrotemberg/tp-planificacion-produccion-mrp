@@ -5,6 +5,7 @@ from src.elementos import Producto
 from src.excepciones import (
 	ColaboradorNoDisponibleError,
 	ElementoDuplicadoError,
+	EstadoSolicitudError,
 	HabilidadRequeridaError,
 	PeriodoOcupadoError,
 	TipoInvalidoError,
@@ -188,6 +189,23 @@ def test_iniciar_proceso_acepta_subtarea_antes_de_su_tarea_padre():
 	resultado = proceso.iniciar_proceso(5, [crear_periodo(8, 9), crear_periodo(9, 10)])
 
 	assert [tarea_en_curso.tarea_base for tarea_en_curso in resultado] == [subtarea, tarea]
+
+
+def test_iniciar_proceso_rechaza_periodos_que_invierten_una_dependencia():
+	subtarea = crear_tarea("Preparación")
+	tarea = crear_tarea("Corte")
+	tarea.agregar_subtarea(subtarea)
+	proceso = ProcesoManufactura(crear_producto())
+	proceso.modificar_proceso([subtarea, tarea])
+
+	with pytest.raises(EstadoSolicitudError, match="no puede iniciar antes"):
+		proceso.iniciar_proceso(
+			5,
+			[crear_periodo(10, 11), crear_periodo(8, 9)],
+		)
+
+	assert subtarea.unidad_trabajo.periodos_ocupados == []
+	assert tarea.unidad_trabajo.periodos_ocupados == []
 
 
 def test_iniciar_proceso_rechaza_subtarea_ubicada_despues_del_padre():

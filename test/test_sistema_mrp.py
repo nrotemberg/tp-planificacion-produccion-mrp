@@ -284,11 +284,13 @@ def test_procesar_solicitudes_respeta_el_orden_fifo():
     sistema.crear_solicitud(Solicitud(1, "Deposito", mesa, 2))
     sistema.crear_solicitud(Solicitud(2, "Deposito", mesa, 2))
 
-    assert list(sistema.cola_solicitudes) == [1, 2]
+    assert len(sistema.cola_solicitudes) == 2
+    assert sistema.cola_solicitudes.ver_primero() == 1
     assert sistema.procesar_siguiente_solicitud() is True
     assert sistema.obtener_solicitud_por_id(1).estado == "planificada"
     assert sistema.obtener_solicitud_por_id(2).estado == "creada"
-    assert list(sistema.cola_solicitudes) == [2]
+    assert len(sistema.cola_solicitudes) == 1
+    assert sistema.cola_solicitudes.ver_primero() == 2
 
 def test_solicitud_no_se_quita_de_la_cola_si_no_puede_planificarse():
     sistema = SistemaMRP()
@@ -300,7 +302,8 @@ def test_solicitud_no_se_quita_de_la_cola_si_no_puede_planificarse():
     sistema.crear_solicitud(Solicitud(1, "Deposito", mesa, 2))
 
     assert sistema.procesar_siguiente_solicitud() is False
-    assert list(sistema.cola_solicitudes) == [1]
+    assert len(sistema.cola_solicitudes) == 1
+    assert sistema.cola_solicitudes.ver_primero() == 1
     assert sistema.obtener_solicitud_por_id(1).estado == "creada"
 
 def test_guardar_y_cargar_pickle_preserva_el_sistema(tmp_path):
