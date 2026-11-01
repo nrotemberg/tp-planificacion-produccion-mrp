@@ -33,58 +33,69 @@ def mostrar_inventario(sistema):
 
 
 def ejecutar_simulacion(sistema):
-    """Coordina las órdenes en el orden en que fueron cargadas."""
     for solicitud in tuple(sistema.solicitudes.values()):
-        print(
-            f"\nSolicitud: {solicitud.id} | "
-            f"Producto: {solicitud.producto.nombre} | "
-            f"Cantidad: {solicitud.cantidad}"
-        )
-
         if not sistema.procesar_siguiente_solicitud():
             raise EstadoSolicitudError(
-                f"No se pudo planificar '{solicitud.id}'. "
-                "Revisá los materiales disponibles."
+                f"No se pudo planificar '{solicitud.id}': "
+                "faltan materiales"
             )
 
-        proceso = solicitud.producto.proceso_manufactura
-        periodos = sistema.obtener_periodos_solicitud(solicitud.id)
+        cantidad = sistema.obtener_cantidad_a_fabricar(
+            solicitud.id
+        )
 
-        tareas = proceso.iniciar_proceso(
-            solicitud.cantidad,
-            list(periodos),
+        print(
+            f"\nSolicitud: {solicitud.id} | "
+            f"Pedidas: {solicitud.cantidad}"
+        )
+        print(
+            f"Desde stock: {solicitud.cantidad - cantidad} | "
+            f"A fabricar: {cantidad}"
         )
 
         if not sistema.iniciar_produccion(solicitud.id):
-            for tarea in tareas:
-                tarea.cancelar()
-
             raise EstadoSolicitudError(
-                f"No se pudo iniciar '{solicitud.id}'"
+                "No se pudo iniciar la solicitud"
             )
 
-        print(f"Estado: {solicitud.estado}")
+        while True:
+            resultado = sistema.fabricar_siguiente_producto(
+                solicitud.id
+            )
 
-        for tarea in tareas:
-            tarea.actualizar_estado("en_curso")
-            print(f"Tarea: {tarea.nombre}")
+            if resultado is None:
+                break
 
-            # Simulación: no espera el transcurso del tiempo real.
-            tarea.finalizar()
+            producto, cantidad_fabricada = resultado
+
+            print(
+                f"Fabricado: {producto.nombre} | "
+                f"Cantidad: {cantidad_fabricada}"
+            )
 
         if not sistema.finalizar_produccion(solicitud.id):
             raise EstadoSolicitudError(
-                f"No se pudo finalizar '{solicitud.id}'"
+                "No se pudo finalizar la solicitud"
             )
 
-        print(f"Estado: {solicitud.estado}")
-
-        costo_total = (
-            solicitud.producto.costo_unitario()
-            * solicitud.cantidad
+        print(
+            f"Estado: {solicitud.estado} "
+            "(pedido entregado)"
         )
 
-        print(f"Costo estándar del lote: ${costo_total:.2f}")
+        costo_unitario = solicitud.producto.costo_unitario()
+        costo_fabricacion = sistema.calcular_costo_fabricacion(
+            solicitud.id
+        )
+
+        print(
+            "Costo estándar de fabricación nueva: "
+            f"${costo_fabricacion:.2f}"
+        )
+        print(
+            "Valor estándar del pedido: "
+            f"${costo_unitario * solicitud.cantidad:.2f}"
+        )
 
 
 def main():

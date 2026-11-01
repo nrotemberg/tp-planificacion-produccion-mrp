@@ -81,6 +81,9 @@ class GestorBOM:
 
         self.faltantes = {}
         self.disponibles = {}
+        self._a_fabricar = {}
+        self._orden_fabricacion = []
+        self._productos_ordenados = set()
         self.stock_libre = {}
         self.visitados = set()
         self.descontar_stock = descontar_stock
@@ -88,6 +91,19 @@ class GestorBOM:
 
         self._recorrer(elemento, cantidad)
         return self.faltantes, self.disponibles
+
+    def calcular_plan(self, elemento, cantidad, inventario):
+        """Calcula materiales, stock utilizado y fabricación por producto."""
+        self.validar_sin_ciclos(elemento)
+
+        insumos, disponibles = self.calcular_requerimientos(elemento, cantidad, descontar_stock=True, inventario=inventario,)
+
+        return {
+            "insumos": dict(insumos),
+            "desde_stock": dict(disponibles),
+            "a_fabricar": dict(self._a_fabricar),
+            "orden_fabricacion": tuple(self._orden_fabricacion),
+        }
 
     def _stock_libre(self, nodo):
         if self.inventario is None:
@@ -126,6 +142,7 @@ class GestorBOM:
         if nodo in self.visitados:
             raise BOMCiclicaError("La BOM contiene un ciclo")
 
+        self._a_fabricar[nodo] = (self._a_fabricar.get(nodo, 0) + necesidad)
         self.visitados.add(nodo)
         try:
             for componente in nodo.lista_elementos_bom:
@@ -135,6 +152,10 @@ class GestorBOM:
                 )
         finally:
             self.visitados.discard(nodo)
+
+        if nodo not in self._productos_ordenados:
+            self._orden_fabricacion.append(nodo)
+            self._productos_ordenados.add(nodo)
 
     def arbol_texto(self, elemento, cantidad=1):
         """Devuelve la BOM completa como un arbol de texto.
@@ -176,3 +197,4 @@ class GestorBOM:
                 )
         finally:
             self.visitados.discard(nodo)
+

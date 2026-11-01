@@ -20,9 +20,82 @@ RUTA_CONFIGURACION_EJEMPLO = (
 
 @pytest.fixture
 def configuracion():
-	with RUTA_CONFIGURACION_EJEMPLO.open(encoding="utf-8") as archivo:
-		return json.load(archivo)
-
+    return {
+        "version": 1,
+        "elementos": [
+            {
+                "id": "madera",
+                "tipo": "insumo",
+                "nombre": "Madera",
+                "unidad_medida": "m2",
+                "costo": 50,
+                "stock_actual": 100,
+            },
+            {
+                "id": "mesa",
+                "tipo": "producto",
+                "nombre": "Mesa",
+                "unidad_medida": "unidad",
+                "costo": 1,
+                "stock_actual": 0,
+                "bom": [
+                    {
+                        "elemento_id": "madera",
+                        "cantidad": 2,
+                    }
+                ],
+            },
+        ],
+        "colaboradores": [
+            {
+                "id": "ana",
+                "nombre": "Ana",
+                "costo_por_hora": 25,
+                "habilidades": ["armado"],
+            }
+        ],
+        "unidades_trabajo": [
+            {
+                "id": "banco",
+                "nombre": "Banco",
+                "capacidad_max_produccion": 10,
+                "costo_fijo": 30,
+                "capacidad_colaboradores": 1,
+            }
+        ],
+        "procesos": [
+            {
+                "id": "proceso_mesa",
+				"producto_id": "mesa",
+                "tareas": [
+                    {
+                        "id": "armado",
+                        "nombre": "Armado de mesa",
+                        "tiempo": 1,
+                        "unidad_trabajo_id": "banco",
+                        "colaboradores_ids": ["ana"],
+                        "habilidades_requeridas": ["armado"],
+                    }
+                ],
+            }
+        ],
+        "solicitudes": [
+            {
+                "id": "SOL-1",
+                "solicitante": "Cliente",
+                "producto_id": "mesa",
+                "cantidad": 2,
+                "periodos": [
+                    {
+                        "producto_id": "mesa",
+                        "tarea_id": "armado",
+                        "inicio": "2026-11-03T08:00:00",
+                        "fin": "2026-11-03T10:00:00",
+                    }
+                ],
+            }
+        ],
+    }
 
 def escribir_configuracion(tmp_path, configuracion):
 	ruta = tmp_path / "configuracion.json"
@@ -30,14 +103,19 @@ def escribir_configuracion(tmp_path, configuracion):
 	return ruta
 
 
-def test_carga_y_programa_la_configuracion_de_ejemplo():
-	sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+def test_carga_y_programa_la_configuracion_de_ejemplo(
+    tmp_path,
+    configuracion,
+):
+    ruta = escribir_configuracion(tmp_path, configuracion)
+    sistema = cargar_sistema_desde_json(ruta)
 
-	assert len(sistema.elementos_produccion) == 2
-	assert len(sistema.colaboradores) == 1
-	assert len(sistema.unidades_trabajo) == 1
-	assert list(sistema.solicitudes) == ["SOL-1"]
-	assert len(sistema.obtener_periodos_solicitud("SOL-1")) == 1
+    assert set(sistema.elementos_produccion) == {"Madera", "Mesa"}
+    assert len(sistema.colaboradores) == 1
+    assert len(sistema.unidades_trabajo) == 1
+    assert list(sistema.solicitudes) == ["SOL-1"]
+    assert len(sistema.obtener_periodos_solicitud("SOL-1")) == 1
+    assert sistema.obtener_solicitud_por_id("SOL-1").estado == "creada"
 
 
 def test_rechaza_secciones_faltantes_y_campos_desconocidos(

@@ -1,5 +1,11 @@
 import sys
 from pathlib import Path
+from datetime import datetime
+from src.manufactura import (
+    PeriodoOperacion,
+    ProcesoManufactura,
+    TareaDefinida,
+)
 
 
 if __name__ == "__main__":
@@ -53,11 +59,35 @@ def crear_sistema():
     madera = Insumo("Madera", "unidad", 5)
     mesa = Producto("Mesa", "unidad", 1)
     mesa.agregar_a_BOM(ComponenteBOM(madera, 2))
+
+    proceso = ProcesoManufactura(mesa)
+    proceso.agregar_tarea(
+        TareaDefinida(
+            nombre="Fabricar mesa",
+            tiempo=1,
+            unidad_trabajo=None,
+            colaboradores_requeridos=[],
+            habilidades_requeridas=[],
+        )
+    )
+
     solicitud = Solicitud(1, "Deposito", mesa, 2)
+
     sistema = SistemaMRP()
     sistema.agregar_elemento(madera, 10)
     sistema.agregar_elemento(mesa)
     sistema.crear_solicitud(solicitud)
+
+    sistema.programar_solicitud(
+        solicitud.id,
+        [
+            PeriodoOperacion(
+                datetime(2026, 11, 3, 8, 0),
+                datetime(2026, 11, 3, 10, 0),
+            )
+        ],
+    )
+
     return sistema, solicitud, madera, mesa
 
 def test_agregar_elementos():
@@ -123,14 +153,34 @@ def test_reservar_recursos_planifica_la_solicitud_en_el_sistema():
 
 def test_iniciar_y_finalizar_produccion_consumen_stock():
     sistema, solicitud, madera, mesa = crear_sistema()
-    sistema.reservar_recursos(1)
+
+    assert sistema.reservar_recursos(1) is True
     assert sistema.iniciar_produccion(1) is True
     assert solicitud.estado == "en curso"
+
+    assert sistema.fabricar_siguiente_producto(1) == (mesa, 2)
+
+    # La fabricación consume madera y deja las mesas reservadas.
+    assert sistema.inventario.obtener_stock(madera) == {
+        "actual": 6,
+        "reservado": 0,
+    }
+    assert sistema.inventario.obtener_stock(mesa) == {
+        "actual": 2,
+        "reservado": 2,
+    }
+
+    # No quedan productos pendientes de fabricación.
+    assert sistema.fabricar_siguiente_producto(1) is None
+
     assert sistema.finalizar_produccion(1) is True
     assert solicitud.estado == "finalizada"
-    assert sistema.inventario.stock[madera]["actual"] == 6
-    assert sistema.inventario.stock[madera]["reservado"] == 0
-    assert sistema.inventario.stock[mesa]["actual"] == 2
+
+    # La entrega retira las dos mesas del inventario.
+    assert sistema.inventario.obtener_stock(mesa) == {
+        "actual": 0,
+        "reservado": 0,
+    }
 
 def test_no_iniciar_dos_veces_la_misma_solicitud():
     sistema, solicitud, _, _ = crear_sistema()
@@ -142,30 +192,89 @@ def test_no_iniciar_dos_veces_la_misma_solicitud():
 
 def test_no_finalizar_dos_veces_la_misma_solicitud():
     sistema, solicitud, madera, mesa = crear_sistema()
-    sistema.reservar_recursos(1)
-    sistema.iniciar_produccion(1)
+
+    assert sistema.reservar_recursos(1) is True
+    assert sistema.iniciar_produccion(1) is True
+    assert sistema.fabricar_siguiente_producto(1) == (mesa, 2)
     assert sistema.finalizar_produccion(1) is True
-    stock_madera = sistema.inventario.stock[madera]["actual"]
-    stock_mesa = sistema.inventario.stock[mesa]["actual"]
+
+    stock_madera = dict(
+        sistema.inventario.obtener_stock(madera)
+    )
+    stock_mesa = dict(
+        sistema.inventario.obtener_stock(mesa)
+    )
+
     assert sistema.finalizar_produccion(1) is False
-    assert sistema.inventario.stock[madera]["actual"] == stock_madera
-    assert sistema.inventario.stock[mesa]["actual"] == stock_mesa
+
+    assert sistema.inventario.obtener_stock(madera) == stock_madera
+    assert sistema.inventario.obtener_stock(mesa) == stock_mesa
     assert solicitud.estado == "finalizada"
 
 def test_bom_anidada_reserva_el_stock_de_los_insumos():
     madera = Insumo("Madera", "unidad", 5)
     base = Producto("Base", "unidad", 1)
     mesa = Producto("Mesa", "unidad", 1)
+
     base.agregar_a_BOM(ComponenteBOM(madera, 3))
     mesa.agregar_a_BOM(ComponenteBOM(base, 2))
+
+    for producto in (base, mesa):
+        proceso = ProcesoManufactura(producto)
+        proceso.agregar_tarea(
+            TareaDefinida(
+                nombre=f"Fabricar {producto.nombre}",
+                tiempo=1,
+                unidad_trabajo=None,
+                colaboradores_requeridos=[],
+                habilidades_requeridas=[],
+            )
+        )
+
     solicitud = Solicitud(1, "Deposito", mesa, 2)
+
     sistema = SistemaMRP()
     sistema.agregar_elemento(madera, 20)
     sistema.agregar_elemento(base)
     sistema.agregar_elemento(mesa)
     sistema.crear_solicitud(solicitud)
+
+    sistema.programar_solicitud(
+        solicitud.id,
+        [
+            PeriodoOperacion(
+                datetime(2026, 11, 3, 8),
+                datetime(2026, 11, 3, 12),
+            )
+        ],
+        producto=base,
+    )
+
+    sistema.programar_solicitud(
+        solicitud.id,
+        [
+            PeriodoOperacion(
+                datetime(2026, 11, 3, 12),
+                datetime(2026, 11, 3, 14),
+            )
+        ],
+        producto=mesa,
+    )
+
     assert sistema.reservar_recursos(1) is True
-    assert sistema.inventario.stock[madera]["reservado"] == 12
+
+    assert sistema.inventario.obtener_stock(madera) == {
+        "actual": 20,
+        "reservado": 12,
+    }
+
+    plan = sistema.obtener_plan_produccion(1)
+
+    assert plan["a_fabricar"] == {
+        base: 4,
+        mesa: 2,
+    }
+    assert plan["orden_fabricacion"] == (base, mesa)
 
 def test_arbol_texto_muestra_bom_completa_sin_consultar_stock(capsys):
     print(GestorBOM().arbol_texto(crear_ranger_ejemplo(), 10))
@@ -241,21 +350,100 @@ def test_reservar_y_consumir_stock_intermedio():
     aluminio = Insumo("Aluminio", "unidad", 5)
     v6 = Producto("V6", "unidad", 1)
     ranger = Producto("Ranger", "unidad", 1)
+
     v6.agregar_a_BOM(ComponenteBOM(aluminio, 2))
     ranger.agregar_a_BOM(ComponenteBOM(v6, 1))
+
+    for producto in (v6, ranger):
+        proceso = ProcesoManufactura(producto)
+        proceso.agregar_tarea(
+            TareaDefinida(
+                nombre=f"Fabricar {producto.nombre}",
+                tiempo=0.5,
+                unidad_trabajo=None,
+                colaboradores_requeridos=[],
+                habilidades_requeridas=[],
+            )
+        )
+
     solicitud = Solicitud(1, "Deposito", ranger, 10)
+
     sistema = SistemaMRP()
     sistema.agregar_elemento(aluminio, 20)
     sistema.agregar_elemento(v6, 4)
     sistema.agregar_elemento(ranger)
     sistema.crear_solicitud(solicitud)
+
+    sistema.programar_solicitud(
+        solicitud.id,
+        [
+            PeriodoOperacion(
+                datetime(2026, 11, 3, 8),
+                datetime(2026, 11, 3, 11),
+            )
+        ],
+        producto=v6,
+    )
+
+    sistema.programar_solicitud(
+        solicitud.id,
+        [
+            PeriodoOperacion(
+                datetime(2026, 11, 3, 11),
+                datetime(2026, 11, 3, 16),
+            )
+        ],
+        producto=ranger,
+    )
+
     assert sistema.reservar_recursos(1) is True
-    assert sistema.inventario.stock[v6]["reservado"] == 4
-    assert sistema.inventario.stock[aluminio]["reservado"] == 12
-    sistema.iniciar_produccion(1)
+
+    # Se aprovechan cuatro motores existentes y se fabrican seis.
+    plan = sistema.obtener_plan_produccion(1)
+    assert plan["a_fabricar"] == {v6: 6, ranger: 10}
+    assert plan["orden_fabricacion"] == (v6, ranger)
+
+    assert sistema.inventario.obtener_stock(v6) == {
+        "actual": 4,
+        "reservado": 4,
+    }
+    assert sistema.inventario.obtener_stock(aluminio) == {
+        "actual": 20,
+        "reservado": 12,
+    }
+
+    assert sistema.iniciar_produccion(1) is True
+
+    # Los seis motores nuevos se suman a los cuatro existentes.
+    assert sistema.fabricar_siguiente_producto(1) == (v6, 6)
+    assert sistema.inventario.obtener_stock(v6) == {
+        "actual": 10,
+        "reservado": 10,
+    }
+    assert sistema.inventario.obtener_stock(aluminio) == {
+        "actual": 8,
+        "reservado": 0,
+    }
+
+    # Fabricar las diez camionetas consume los diez motores.
+    assert sistema.fabricar_siguiente_producto(1) == (ranger, 10)
+    assert sistema.inventario.obtener_stock(v6) == {
+        "actual": 0,
+        "reservado": 0,
+    }
+    assert sistema.inventario.obtener_stock(ranger) == {
+        "actual": 10,
+        "reservado": 10,
+    }
+
+    assert sistema.fabricar_siguiente_producto(1) is None
     assert sistema.finalizar_produccion(1) is True
-    assert sistema.inventario.stock[v6]["actual"] == 0
-    assert sistema.inventario.stock[v6]["reservado"] == 0
+    assert solicitud.estado == "finalizada"
+
+    assert sistema.inventario.obtener_stock(ranger) == {
+        "actual": 0,
+        "reservado": 0,
+    }
 
 def test_no_se_puede_finalizar_solicitud_sin_iniciarla():
     sistema, _, _, _ = crear_sistema()
@@ -276,21 +464,59 @@ def test_metodos_rechazan_id_inexistente():
 
 def test_procesar_solicitudes_respeta_el_orden_fifo():
     sistema = SistemaMRP()
+
     madera = Insumo("Madera", "unidad", 5)
     mesa = Producto("Mesa", "unidad", 1)
     mesa.agregar_a_BOM(ComponenteBOM(madera, 1))
+
+    proceso = ProcesoManufactura(mesa)
+    proceso.agregar_tarea(
+        TareaDefinida(
+            nombre="Fabricar mesa",
+            tiempo=1,
+            unidad_trabajo=None,
+            colaboradores_requeridos=[],
+            habilidades_requeridas=[],
+        )
+    )
+
     sistema.agregar_elemento(madera, 10)
     sistema.agregar_elemento(mesa)
-    sistema.crear_solicitud(Solicitud(1, "Deposito", mesa, 2))
-    sistema.crear_solicitud(Solicitud(2, "Deposito", mesa, 2))
+
+    for identificador, hora_inicio in ((1, 8), (2, 10)):
+        sistema.crear_solicitud(
+            Solicitud(identificador, "Deposito", mesa, 2)
+        )
+        sistema.programar_solicitud(
+            identificador,
+            [
+                PeriodoOperacion(
+                    datetime(2026, 11, 3, hora_inicio),
+                    datetime(2026, 11, 3, hora_inicio + 2),
+                )
+            ],
+        )
 
     assert len(sistema.cola_solicitudes) == 2
     assert sistema.cola_solicitudes.ver_primero() == 1
+
     assert sistema.procesar_siguiente_solicitud() is True
+
     assert sistema.obtener_solicitud_por_id(1).estado == "planificada"
     assert sistema.obtener_solicitud_por_id(2).estado == "creada"
     assert len(sistema.cola_solicitudes) == 1
     assert sistema.cola_solicitudes.ver_primero() == 2
+
+    assert sistema.procesar_siguiente_solicitud() is True
+
+    assert sistema.obtener_solicitud_por_id(2).estado == "planificada"
+    assert len(sistema.cola_solicitudes) == 0
+    assert sistema.inventario.obtener_stock(madera) == {
+        "actual": 10,
+        "reservado": 4,
+    }
+
+    assert sistema.procesar_siguiente_solicitud() is False
 
 def test_solicitud_no_se_quita_de_la_cola_si_no_puede_planificarse():
     sistema = SistemaMRP()

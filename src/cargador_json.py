@@ -143,7 +143,6 @@ def _crear_elementos(datos, sistema):
 
     return elementos_por_id
 
-
 def _cargar_bom(datos, elementos_por_id):
     """Vincula los artículos una vez que todos fueron creados."""
     for dato in datos["elementos"]:
@@ -193,7 +192,6 @@ def _cargar_bom(datos, elementos_por_id):
                     f"BOM de '{identificador}': {error}"
                 ) from error
 
-
 def cargar_sistema_desde_json(ruta):
     """Construye y programa un sistema nuevo sin ejecutar producción."""
     datos = leer_configuracion(ruta)
@@ -220,7 +218,6 @@ def cargar_sistema_desde_json(ruta):
     )
 
     return sistema
-
 
 def _validar_registro(dato, obligatorios, opcionales, registrados, contexto):
     if not isinstance(dato, dict):
@@ -258,7 +255,6 @@ def _validar_registro(dato, obligatorios, opcionales, registrados, contexto):
         )
 
     return identificador
-
 
 def _cargar_colaboradores(datos, sistema):
     colaboradores_por_id = {}
@@ -301,7 +297,6 @@ def _cargar_colaboradores(datos, sistema):
         colaboradores_por_id[identificador] = colaborador
 
     return colaboradores_por_id
-
 
 def _cargar_unidades_trabajo(datos, sistema):
     unidades_por_id = {}
@@ -360,7 +355,6 @@ def _cargar_unidades_trabajo(datos, sistema):
 
     return unidades_por_id
 
-
 def _buscar_referencia(registro, identificador, contexto):
     """Busca un objeto existente mediante su ID externo."""
     if (
@@ -372,7 +366,6 @@ def _buscar_referencia(registro, identificador, contexto):
         )
 
     return registro[identificador]
-
 
 def _cargar_procesos(
     datos,
@@ -527,7 +520,6 @@ def _cargar_procesos(
 
     return tareas_por_producto
 
-
 def _leer_fecha(valor, contexto):
     """Interpreta una fecha ISO expresada en hora local."""
     if not isinstance(valor, str):
@@ -549,13 +541,7 @@ def _leer_fecha(valor, contexto):
 
     return fecha
 
-
-def _cargar_solicitudes(
-    datos,
-    sistema,
-    elementos_por_id,
-    tareas_por_producto,
-):
+def _cargar_solicitudes(datos, sistema, elementos_por_id, tareas_por_producto,):
     solicitudes_registradas = set()
 
     for posicion, dato in enumerate(datos["solicitudes"]):
@@ -598,60 +584,7 @@ def _cargar_solicitudes(
                 f"{contexto}: el producto no tiene proceso de manufactura"
             )
 
-        filas_periodos = dato["periodos"]
-
-        if not isinstance(filas_periodos, list):
-            raise ErrorConfiguracion(
-                f"{contexto}: periodos debe ser una lista"
-            )
-
-        periodos_por_tarea = {}
-
-        for indice, fila in enumerate(filas_periodos):
-            contexto_periodo = f"{contexto}.periodos[{indice}]"
-
-            if not isinstance(fila, dict) or set(fila) != {
-                "tarea_id", "inicio", "fin"
-            }:
-                raise ErrorConfiguracion(
-                    f"{contexto_periodo}: debe contener "
-                    "tarea_id, inicio y fin"
-                )
-
-            tarea_id = fila["tarea_id"]
-            _buscar_referencia(
-                tareas_por_id, tarea_id, contexto_periodo
-            )
-
-            if tarea_id in periodos_por_tarea:
-                raise ErrorConfiguracion(
-                    f"{contexto_periodo}: período repetido "
-                    f"para '{tarea_id}'"
-                )
-
-            inicio = _leer_fecha(fila["inicio"], contexto_periodo)
-            fin = _leer_fecha(fila["fin"], contexto_periodo)
-
-            try:
-                periodos_por_tarea[tarea_id] = PeriodoOperacion(
-                    inicio, fin
-                )
-            except MRPError as error:
-                raise ErrorConfiguracion(
-                    f"{contexto_periodo}: {error}"
-                ) from error
-
-        if set(periodos_por_tarea) != set(tareas_por_id):
-            raise ErrorConfiguracion(
-                f"{contexto}: debe existir un período por cada tarea"
-            )
-
-        # Conserva el orden de las tareas del proceso,
-        # independientemente del orden de los períodos en el JSON.
-        periodos = [
-            periodos_por_tarea[tarea_id]
-            for tarea_id in tareas_por_id
-        ]
+        periodos_por_producto = _leer_periodos_por_producto(dato["periodos"], producto_id, elementos_por_id, tareas_por_producto, contexto,)
 
         solicitante = dato.get("solicitante", "Sin especificar")
 
@@ -673,13 +606,116 @@ def _cargar_solicitudes(
                     f"{contexto}: la solicitud ya existe"
                 )
 
-            sistema.programar_solicitud(identificador, periodos)
+            for producto_programado, periodos in (periodos_por_producto.items()):
+                sistema.programar_solicitud(identificador, periodos, producto=producto_programado,)
 
         except MRPError as error:
-            raise ErrorConfiguracion(
-                f"{contexto}: {error}"
-            ) from error
+            raise ErrorConfiguracion(f"{contexto}: {error}") from error
 
         solicitudes_registradas.add(identificador)
 
+def _leer_periodos_por_producto(filas, producto_principal_id, elementos_por_id, tareas_por_producto, contexto,):
+    if not isinstance(filas, list):
+        raise ErrorConfiguracion(
+            f"{contexto}: periodos debe ser una lista"
+        )
+
+    agrupados = {}
+
+    for indice, fila in enumerate(filas):
+        contexto_periodo = f"{contexto}.periodos[{indice}]"
+
+        obligatorios = {"tarea_id", "inicio", "fin"}
+        permitidos = obligatorios | {"producto_id"}
+
+        if (
+            not isinstance(fila, dict)
+            or obligatorios - fila.keys()
+            or fila.keys() - permitidos
+        ):
+            raise ErrorConfiguracion(
+                f"{contexto_periodo}: debe contener tarea_id, "
+                "inicio, fin y opcionalmente producto_id"
+            )
+
+        # Sin producto_id, corresponde al producto principal.
+        producto_id = fila.get(
+            "producto_id",
+            producto_principal_id,
+        )
+
+        _buscar_referencia(
+            elementos_por_id,
+            producto_id,
+            contexto_periodo,
+        )
+
+        tareas = _buscar_referencia(
+            tareas_por_producto,
+            producto_id,
+            contexto_periodo,
+        )
+
+        tarea_id = fila["tarea_id"]
+
+        _buscar_referencia(
+            tareas,
+            tarea_id,
+            contexto_periodo,
+        )
+
+        periodos_producto = agrupados.setdefault(
+            producto_id,
+            {},
+        )
+
+        if tarea_id in periodos_producto:
+            raise ErrorConfiguracion(
+                f"{contexto_periodo}: período repetido "
+                f"para '{producto_id}/{tarea_id}'"
+            )
+
+        inicio = _leer_fecha(
+            fila["inicio"],
+            contexto_periodo,
+        )
+        fin = _leer_fecha(
+            fila["fin"],
+            contexto_periodo,
+        )
+
+        try:
+            periodos_producto[tarea_id] = PeriodoOperacion(
+                inicio,
+                fin,
+            )
+        except MRPError as error:
+            raise ErrorConfiguracion(
+                f"{contexto_periodo}: {error}"
+            ) from error
+
+    if producto_principal_id not in agrupados:
+        raise ErrorConfiguracion(
+            f"{contexto}: faltan los períodos del producto principal"
+        )
+
+    resultado = {}
+
+    for producto_id, periodos_por_tarea in agrupados.items():
+        tareas = tareas_por_producto[producto_id]
+
+        if set(periodos_por_tarea) != set(tareas):
+            raise ErrorConfiguracion(
+                f"{contexto}: debe existir un período por tarea "
+                f"del producto '{producto_id}'"
+            )
+
+        producto = elementos_por_id[producto_id]
+
+        resultado[producto] = [
+            periodos_por_tarea[tarea_id]
+            for tarea_id in tareas
+        ]
+
+    return resultado
 
