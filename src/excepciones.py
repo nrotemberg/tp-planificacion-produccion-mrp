@@ -68,6 +68,11 @@ class PeriodoOcupadoError(MRPError):
     pass
 
 
+class IntervaloInvalidoError(MRPError):
+    """Se levanta cuando un intervalo de operación no es válido."""
+    pass
+
+
 class ColaboradorNoDisponibleError(MRPError):
     """Se levanta cuando un colaborador no está disponible en el periodo indicado."""
     pass
@@ -99,5 +104,6 @@ __all__ = [
     "HabilidadRequeridaError",
     "RecursosInsuficientesError",
     "PeriodoOcupadoError",
+    "IntervaloInvalidoError",
     "ColaboradorNoDisponibleError", 
     "ErrorConfiguracion",]

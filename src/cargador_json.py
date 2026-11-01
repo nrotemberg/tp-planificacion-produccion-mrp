@@ -521,7 +521,7 @@ def _cargar_procesos(
     return tareas_por_producto
 
 def _leer_fecha(valor, contexto):
-    """Interpreta una fecha ISO expresada en hora local."""
+    """Interpreta una fecha ISO, con fechas sin zona asumidas en UTC."""
     if not isinstance(valor, str):
         raise ErrorConfiguracion(
             f"{contexto}: la fecha debe ser un texto"
@@ -533,11 +533,6 @@ def _leer_fecha(valor, contexto):
         raise ErrorConfiguracion(
             f"{contexto}: fecha inválida '{valor}'"
         ) from error
-
-    if fecha.tzinfo is not None:
-        raise ErrorConfiguracion(
-            f"{contexto}: usá hora local sin zona horaria"
-        )
 
     return fecha
 
@@ -718,4 +713,3 @@ def _leer_periodos_por_producto(filas, producto_principal_id, elementos_por_id, 
         ]
 
     return resultado
-

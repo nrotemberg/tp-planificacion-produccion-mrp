@@ -5,6 +5,7 @@ from src.manufactura import (
     PeriodoOperacion,
     ProcesoManufactura,
     TareaDefinida,
+    UnidadTrabajo,
 )
 
 
@@ -103,6 +104,45 @@ def test_no_agregar_elemento_duplicado():
     assert sistema.agregar_elemento(madera) is True
     assert sistema.agregar_elemento(madera) is False
     assert sistema.elementos_produccion == {"Madera": madera}
+
+
+def test_detectar_cuello_devuelve_hasta_tres_unidades_por_horas_ocupadas():
+    sistema = SistemaMRP()
+    unidades = [
+        UnidadTrabajo("Unidad 1", 10, 1, 1),
+        UnidadTrabajo("Unidad 2", 10, 1, 1),
+        UnidadTrabajo("Unidad 3", 10, 1, 1),
+        UnidadTrabajo("Unidad 4", 10, 1, 1),
+    ]
+    for unidad in unidades:
+        sistema.agregar_unidad_trabajo(unidad)
+
+    unidades[0].asignar_periodo(
+        PeriodoOperacion(datetime(2026, 11, 1, 8), datetime(2026, 11, 1, 10))
+    )
+    unidades[1].asignar_periodo(
+        PeriodoOperacion(datetime(2026, 11, 1, 8), datetime(2026, 11, 1, 13))
+    )
+    unidades[2].asignar_periodo(
+        PeriodoOperacion(datetime(2026, 11, 1, 8), datetime(2026, 11, 1, 12))
+    )
+    unidades[3].asignar_periodo(
+        PeriodoOperacion(datetime(2026, 11, 1, 8), datetime(2026, 11, 1, 9))
+    )
+
+    assert sistema.detectar_cuello() == [
+        {"unidad": unidades[1], "horas_ocupadas": 5},
+        {"unidad": unidades[2], "horas_ocupadas": 4},
+        {"unidad": unidades[0], "horas_ocupadas": 2},
+    ]
+
+
+def test_detectar_cuello_omite_unidades_sin_periodos_y_devuelve_lista_vacia():
+    sistema = SistemaMRP()
+    unidad = UnidadTrabajo("Unidad", 10, 1, 1)
+    sistema.agregar_unidad_trabajo(unidad)
+
+    assert sistema.detectar_cuello() == []
 
 def test_crear_y_obtener_solicitud_por_id():
     sistema, solicitud, _, _ = crear_sistema()

@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.elementos import Producto
 from src.excepciones import (
@@ -9,6 +9,7 @@ from src.excepciones import (
     ElementoDuplicadoError,
     EstadoSolicitudError,
     HabilidadRequeridaError,
+    IntervaloInvalidoError,
     PeriodoOcupadoError,
     RecursosInsuficientesError,
     TipoInvalidoError,
@@ -697,12 +698,14 @@ class PeriodoOperacion:
     def __init__(self, inicio, fin):
         if not isinstance(inicio, datetime) or not isinstance(fin, datetime):
             raise TipoInvalidoError("Inicio y fin deben ser datetime")
-        if self._tiene_zona_horaria(inicio) != self._tiene_zona_horaria(fin):
-            raise TipoInvalidoError(
-                "Inicio y fin deben tener el mismo tipo de zona horaria"
-            )
+
+        inicio = self._normalizar_a_utc(inicio)
+        fin = self._normalizar_a_utc(fin)
+
         if fin <= inicio:
-            raise PeriodoOcupadoError("La fecha fin debe ser posterior a la fecha inicio")
+            raise IntervaloInvalidoError(
+                "La fecha fin debe ser posterior a la fecha inicio"
+            )
         self.inicio = inicio
         self.fin = fin
 
@@ -718,3 +721,9 @@ class PeriodoOperacion:
     @staticmethod
     def _tiene_zona_horaria(valor):
         return valor.tzinfo is not None and valor.utcoffset() is not None
+
+    @staticmethod
+    def _normalizar_a_utc(valor):
+        if not PeriodoOperacion._tiene_zona_horaria(valor):
+            return valor.replace(tzinfo=timezone.utc)
+        return valor.astimezone(timezone.utc)

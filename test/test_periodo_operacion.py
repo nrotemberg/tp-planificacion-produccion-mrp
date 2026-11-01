@@ -3,7 +3,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.manufactura import PeriodoOperacion
-from src.excepciones import PeriodoOcupadoError, TipoInvalidoError
+from src.excepciones import (
+	IntervaloInvalidoError,
+	TipoInvalidoError,
+)
 
 
 def crear_datetime(hora, minuto=0):
@@ -16,8 +19,8 @@ def test_crear_periodo_operacion_inicializa_inicio_y_fin():
 
 	periodo = PeriodoOperacion(inicio, fin)
 
-	assert periodo.inicio == inicio
-	assert periodo.fin == fin
+	assert periodo.inicio == inicio.replace(tzinfo=timezone.utc)
+	assert periodo.fin == fin.replace(tzinfo=timezone.utc)
 
 
 def test_crear_periodo_rechaza_inicio_que_no_sea_datetime():
@@ -38,16 +41,28 @@ def test_crear_periodo_rechaza_fin_que_no_sea_datetime():
 	],
 )
 def test_crear_periodo_rechaza_fin_igual_o_anterior_al_inicio(inicio, fin):
-	with pytest.raises(PeriodoOcupadoError, match="fecha fin debe ser posterior"):
+	with pytest.raises(IntervaloInvalidoError, match="fecha fin debe ser posterior"):
 		PeriodoOperacion(inicio, fin)
 
 
-def test_crear_periodo_rechaza_mezcla_de_datetimes_con_y_sin_zona_horaria():
+def test_crear_periodo_normaliza_datetimes_sin_zona_a_utc():
 	inicio = crear_datetime(8)
 	fin = datetime(2026, 9, 22, 10, tzinfo=timezone.utc)
 
-	with pytest.raises(TipoInvalidoError, match="mismo tipo de zona horaria"):
-		PeriodoOperacion(inicio, fin)
+	periodo = PeriodoOperacion(inicio, fin)
+
+	assert periodo.inicio == inicio.replace(tzinfo=timezone.utc)
+	assert periodo.fin == fin
+
+
+def test_crear_periodo_convierte_datetimes_con_zona_a_utc():
+	inicio = datetime(2026, 9, 22, 8, tzinfo=timezone(timedelta(hours=-3)))
+	fin = datetime(2026, 9, 22, 10, tzinfo=timezone(timedelta(hours=-3)))
+
+	periodo = PeriodoOperacion(inicio, fin)
+
+	assert periodo.inicio == datetime(2026, 9, 22, 11, tzinfo=timezone.utc)
+	assert periodo.fin == datetime(2026, 9, 22, 13, tzinfo=timezone.utc)
 
 
 def test_crear_periodo_acepta_datetimes_con_la_misma_zona_horaria():

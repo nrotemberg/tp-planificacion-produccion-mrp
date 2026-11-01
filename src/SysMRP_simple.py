@@ -345,11 +345,17 @@ class SistemaMRP:
                 "Debe existir un período por tarea"
             )
 
-        programacion = self._periodos_solicitudes.setdefault(
+        proceso.validar_recursos_programados(
+            solicitud.cantidad,
+            periodos,
+        )
+        self._validar_conflictos_programacion(
             id_solicitud,
-            {},
+            proceso.tareas,
+            periodos,
         )
 
+        programacion = self._periodos_solicitudes.setdefault(id_solicitud, {})
         programacion[producto] = tuple(periodos)
 
     def obtener_periodos_solicitud(self, id_solicitud, producto=None,):
@@ -367,55 +373,82 @@ class SistemaMRP:
         return programacion.get(producto, ())
 
     def _validar_conflictos_programacion(self, id_solicitud, tareas, periodos,):
-        for otro_id, otros_periodos in self._periodos_efectivos.items():
+        for otro_id, programaciones in self._periodos_solicitudes.items():
             if otro_id == id_solicitud:
                 continue
 
             otra_solicitud = self.obtener_solicitud_por_id(otro_id)
-            otro_proceso = getattr(
-                otra_solicitud.producto,
-                "proceso_manufactura",
-                None,
-            )
-
-            if otro_proceso is None:
+            if otra_solicitud is None:
                 continue
 
-            for tarea, periodo in zip(tareas, periodos):
-                for otra_tarea, otro_periodo in zip(
-                    otro_proceso.tareas,
-                    otros_periodos,
-                ):
-                    if not periodo.se_solapa_con(otro_periodo):
-                        continue
+            for otro_producto, otros_periodos in programaciones.items():
+                otro_proceso = getattr(
+                    otro_producto,
+                    "proceso_manufactura",
+                    None,
+                )
+                if otro_proceso is None:
+                    continue
 
-                    if (
-                        tarea.unidad_trabajo is not None
-                        and tarea.unidad_trabajo is otra_tarea.unidad_trabajo
+                for tarea, periodo in zip(tareas, periodos):
+                    for otra_tarea, otro_periodo in zip(
+                        otro_proceso.tareas,
+                        otros_periodos,
                     ):
-                        raise EstadoSolicitudError(
-                            f"La unidad de trabajo "
-                            f"'{tarea.unidad_trabajo.nombre}' ya está "
-                            "programada en un período superpuesto"
-                        )
+                        if not periodo.se_solapa_con(otro_periodo):
+                            continue
 
-                    colaboradores_comunes = [
-                        colaborador
-                        for colaborador in tarea.colaboradores_requeridos
-                        if colaborador in otra_tarea.colaboradores_requeridos
-                    ]
-                    if colaboradores_comunes:
-                        colaborador = next(iter(colaboradores_comunes))
-                        raise EstadoSolicitudError(
-                            f"El colaborador '{colaborador.nombre}' ya está "
-                            "programado en un período superpuesto"
-                        )
+                        if (
+                            tarea.unidad_trabajo is not None
+                            and tarea.unidad_trabajo is otra_tarea.unidad_trabajo
+                        ):
+                            raise EstadoSolicitudError(
+                                f"La unidad de trabajo "
+                                f"'{tarea.unidad_trabajo.nombre}' ya está "
+                                "programada en un período superpuesto"
+                            )
+
+                        colaboradores_comunes = [
+                            colaborador
+                            for colaborador in tarea.colaboradores_requeridos
+                            if colaborador in otra_tarea.colaboradores_requeridos
+                        ]
+                        if colaboradores_comunes:
+                            colaborador = next(iter(colaboradores_comunes))
+                            raise EstadoSolicitudError(
+                                f"El colaborador '{colaborador.nombre}' ya está "
+                                "programado en un período superpuesto"
+                            )
 
     def finalizar_produccion(self, id_solicitud):
         return self.consumir_stock(id_solicitud)
 
     def detectar_cuello(self):
-        pass
+        """Devuelve hasta tres unidades ordenadas por horas ocupadas.
+
+        Cada resultado contiene la unidad y la suma de las duraciones de sus
+        períodos ocupados. Las unidades sin períodos ocupados no se incluyen.
+        """
+        unidades_con_carga = []
+
+        for unidad in self.unidades_trabajo:
+            horas_ocupadas = sum(
+                periodo.duracion_horas()
+                for periodo in unidad.periodos_ocupados
+            )
+            if horas_ocupadas > 0:
+                unidades_con_carga.append(
+                    {
+                        "unidad": unidad,
+                        "horas_ocupadas": horas_ocupadas,
+                    }
+                )
+
+        unidades_con_carga.sort(
+            key=lambda carga: carga["horas_ocupadas"],
+            reverse=True,
+        )
+        return unidades_con_carga[:3]
 
     def _obtener_plan_materiales(self, solicitud):
         """Separa lo que hay que fabricar de lo que ya existe en stock.
