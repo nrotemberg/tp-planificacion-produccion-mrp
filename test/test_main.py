@@ -2,7 +2,15 @@ from pathlib import Path
 
 from src.cargador_json import cargar_sistema_desde_json
 from src.persistencia_json import cargar_estado
-from main import _productos_fabricables, crear_solicitud
+from main import (
+    _productos_fabricables,
+    crear_solicitud,
+    mostrar_cuellos_de_botella,
+    mostrar_colaboradores,
+    mostrar_historial_tareas,
+    mostrar_tareas_cargadas,
+    mostrar_unidades_trabajo,
+)
 
 
 RUTA_CONFIGURACION_EJEMPLO = (
@@ -52,3 +60,54 @@ def test_estado_inicial_no_carga_stock_de_ejemplo():
             "actual": 0,
             "reservado": 0,
         }
+
+
+def test_mostrar_cuellos_de_botella_imprime_las_unidades_mas_cargadas(
+    capsys,
+):
+    sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+
+    mostrar_cuellos_de_botella(sistema)
+
+    salida = capsys.readouterr().out
+    assert "Cuellos de botella" in salida
+    assert "No hay unidades de trabajo ocupadas." in salida
+
+
+def test_mostrar_historial_tareas_informa_si_no_hay_tareas_en_la_sesion(
+    capsys,
+):
+    sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+
+    mostrar_historial_tareas(sistema)
+
+    salida = capsys.readouterr().out
+    assert "Historial de tareas" in salida
+    assert "No hay tareas ejecutadas en esta sesión." in salida
+
+
+def test_mostrar_tareas_cargadas_imprime_informacion_relevante(capsys):
+    sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+
+    mostrar_tareas_cargadas(sistema)
+
+    salida = capsys.readouterr().out
+    assert "Tareas cargadas" in salida
+    assert "Fabricar pata" in salida
+    assert "Producto: Pata" in salida
+    assert "Tiempo:" in salida
+
+
+def test_mostrar_unidades_y_colaboradores_cargados(capsys):
+    sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+
+    mostrar_unidades_trabajo(sistema)
+    mostrar_colaboradores(sistema)
+
+    salida = capsys.readouterr().out
+    assert "Unidades de trabajo" in salida
+    assert "Sierra" in salida
+    assert "Capacidad máxima:" in salida
+    assert "Colaboradores" in salida
+    assert "Ana" in salida
+    assert "Habilidades:" in salida

@@ -35,6 +35,110 @@ def mostrar_inventario(sistema):
         )
 
 
+def mostrar_cuellos_de_botella(sistema):
+    """Imprime las unidades de trabajo con mayor carga acumulada."""
+    cuellos = sistema.detectar_cuello()
+
+    print("\nCuellos de botella")
+    if not cuellos:
+        print("No hay unidades de trabajo ocupadas.")
+        return
+
+    for posicion, carga in enumerate(cuellos, start=1):
+        unidad = carga["unidad"]
+        print(
+            f"{posicion}. {unidad.nombre}: "
+            f"{carga['horas_ocupadas']} horas ocupadas"
+        )
+
+
+def mostrar_historial_tareas(sistema):
+    # Muestra el historial de tareas ejecutadas durante la sesión actual.
+    historial = sistema.obtener_historial_tareas()
+
+    print("\nHistorial de tareas")
+    if not historial:
+        print("No hay tareas ejecutadas en esta sesión.")
+        return
+
+    for ejecucion in historial:
+        print(
+            f"- {ejecucion['solicitud']} | "
+            f"{ejecucion['producto'].nombre} | "
+            f"{ejecucion['tarea'].nombre} | "
+            f"{ejecucion['estado']}"
+        )
+
+
+def mostrar_tareas_cargadas(sistema):
+    """Imprime todas las tareas definidas en los procesos cargados."""
+    print("\nTareas cargadas")
+    tareas_cargadas = [
+        (producto, tarea)
+        for producto in sistema.elementos_produccion.values()
+        if isinstance(producto, Producto) and producto.proceso_manufactura
+        for tarea in producto.proceso_manufactura.tareas
+    ]
+
+    if not tareas_cargadas:
+        print("No hay tareas cargadas.")
+        return
+
+    for producto, tarea in tareas_cargadas:
+        unidad = (
+            tarea.unidad_trabajo.nombre
+            if tarea.unidad_trabajo is not None
+            else "Sin unidad de trabajo"
+        )
+        colaboradores = ", ".join(
+            colaborador.nombre
+            for colaborador in tarea.colaboradores_requeridos
+        ) or "Sin colaboradores"
+        habilidades = ", ".join(tarea.habilidades_requeridas) or "Sin habilidades"
+        subtareas = ", ".join(subtarea.nombre for subtarea in tarea.subtareas)
+        print(
+            f"- {tarea.nombre} | Producto: {producto.nombre} | "
+            f"Tiempo: {tarea.tiempo} h | UT: {unidad} | "
+            f"Colaboradores: {colaboradores} | "
+            f"Habilidades: {habilidades} | "
+            f"Subtareas: {subtareas or 'Ninguna'}"
+        )
+
+
+def mostrar_unidades_trabajo(sistema):
+    """Imprime todas las unidades de trabajo cargadas."""
+    print("\nUnidades de trabajo")
+    if not sistema.unidades_trabajo:
+        print("No hay unidades de trabajo cargadas.")
+        return
+
+    for unidad in sistema.unidades_trabajo:
+        print(
+            f"- {unidad.nombre} | Capacidad máxima: "
+            f"{unidad.capacidad_max_produccion} | "
+            f"Costo fijo: ${unidad.costo_fijo:.2f} | "
+            f"Capacidad de colaboradores: {unidad.capacidad_colaboradores} | "
+            f"Períodos ocupados: {len(unidad.periodos_ocupados)}"
+        )
+
+
+def mostrar_colaboradores(sistema):
+    """Imprime todos los colaboradores cargados."""
+    print("\nColaboradores")
+    if not sistema.colaboradores:
+        print("No hay colaboradores cargados.")
+        return
+
+    for colaborador in sistema.colaboradores:
+        habilidades = ", ".join(colaborador.habilidades) or "Sin habilidades"
+        print(
+            f"- {colaborador.nombre} | Costo por hora: "
+            f"${colaborador.costo_por_hora:.2f} | "
+            f"Habilidades: {habilidades} | "
+            f"Períodos ocupados: {len(colaborador.periodos_ocupados)}"
+        )
+
+
 def _leer_entero_positivo(mensaje):
     try:
         cantidad = int(input(mensaje).strip())
@@ -206,7 +310,12 @@ def mostrar_menu():
         "3. Mostrar inventario\n"
         "4. Agregar 100 unidades a cada insumo\n"
         "5. Crear solicitud\n"
-        "6. Salir"
+        "6. Detectar cuellos de botella\n"
+        "7. Mostrar historial de tareas\n"
+        "8. Mostrar tareas cargadas\n"
+        "9. Mostrar unidades de trabajo\n"
+        "10. Mostrar colaboradores\n"
+        "11. Salir"
     )
 
 
@@ -216,12 +325,12 @@ def ejecutar_menu(sistema, ruta_estado):
         mostrar_menu()
         opcion = input("Elegí una opción: ").strip()
 
-        if opcion == "6":
+        if opcion == "11":
             guardar_estado(ruta_estado, sistema)
             print("Saliendo del sistema.")
             return
-        if opcion not in ("1", "2", "3", "4", "5"):
-            print("Opción inválida. Elegí un número del 1 al 6.")
+        if opcion not in ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"):
+            print("Opción inválida. Elegí un número del 1 al 11.")
             continue
 
         try:
@@ -233,8 +342,18 @@ def ejecutar_menu(sistema, ruta_estado):
                 mostrar_inventario(sistema)
             elif opcion == "4":
                 agregar_stock(sistema)
-            else:
+            elif opcion == "5":
                 crear_solicitud(sistema)
+            elif opcion == "6":
+                mostrar_cuellos_de_botella(sistema)
+            elif opcion == "7":
+                mostrar_historial_tareas(sistema)
+            elif opcion == "8":
+                mostrar_tareas_cargadas(sistema)
+            elif opcion == "9":
+                mostrar_unidades_trabajo(sistema)
+            else:
+                mostrar_colaboradores(sistema)
         except MRPError as error:
             print(f"\nNo se pudo completar la operación: {error}")
         guardar_estado(ruta_estado, sistema)

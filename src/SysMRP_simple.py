@@ -207,6 +207,24 @@ class SistemaMRP:
 
         return producto, cantidad
 
+    def obtener_historial_tareas(self):
+        """Devuelve las ejecuciones de tareas registradas durante la sesión."""
+        historial = []
+
+        for id_solicitud, productos in self._tareas_fabricacion.items():
+            for producto, tareas in productos.items():
+                for tarea in tareas:
+                    historial.append(
+                        {
+                            "solicitud": id_solicitud,
+                            "producto": producto,
+                            "tarea": tarea,
+                            "estado": tarea.estado,
+                        }
+                    )
+
+        return historial
+
     def consumir_stock(self, id_solicitud):
         """Entrega el pedido cuando terminaron todas sus fabricaciones."""
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
