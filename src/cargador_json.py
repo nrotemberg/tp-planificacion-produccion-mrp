@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 
 from src.SysMRP_simple import SistemaMRP
 from src.elementos import Insumo, Producto
@@ -9,7 +8,6 @@ from src.manufactura import (
     UnidadTrabajo,
     ProcesoManufactura,
     TareaDefinida,
-    PeriodoOperacion,
 )
 
 def leer_configuracion(ruta):
@@ -33,9 +31,9 @@ def leer_configuracion(ruta):
             "La configuración debe ser un objeto JSON"
         )
 
-    if type(datos.get("version")) is not int or datos["version"] != 1:
+    if type(datos.get("version")) is not int or datos["version"] != 3:
         raise ErrorConfiguracion(
-            "La configuración debe indicar una versión igual a 1"
+            "La configuración debe indicar una versión igual a 3"
         )
 
     secciones = (
@@ -43,7 +41,6 @@ def leer_configuracion(ruta):
         "colaboradores",
         "unidades_trabajo",
         "procesos",
-        "solicitudes",
     )
 
     campos_permitidos = {"version", *secciones}
@@ -80,7 +77,7 @@ def _crear_elementos(datos, sistema):
             )
 
         obligatorios = {"id", "tipo", "nombre", "unidad_medida", "costo"}
-        permitidos = obligatorios | {"stock_actual", "bom"}
+        permitidos = obligatorios | {"bom"}
 
         if obligatorios - dato.keys():
             raise ErrorConfiguracion(
@@ -113,13 +110,6 @@ def _crear_elementos(datos, sistema):
                 f"{contexto}: el tipo debe ser 'insumo' o 'producto'"
             )
 
-        stock = dato.get("stock_actual", 0)
-
-        if type(stock) is not int or stock < 0:
-            raise ErrorConfiguracion(
-                f"{contexto}: el stock debe ser un entero no negativo"
-            )
-
         try:
             elemento = clase(
                 dato["nombre"],
@@ -127,7 +117,7 @@ def _crear_elementos(datos, sistema):
                 dato["costo"],
             )
 
-            agregado = sistema.agregar_elemento(elemento, stock)
+            agregado = sistema.agregar_elemento(elemento)
 
         except MRPError as error:
             raise ErrorConfiguracion(
@@ -208,13 +198,6 @@ def cargar_sistema_desde_json(ruta):
         elementos_por_id,
         colaboradores_por_id,
         unidades_por_id,
-    )
-
-    _cargar_solicitudes(
-        datos,
-        sistema,
-        elementos_por_id,
-        tareas_por_producto,
     )
 
     return sistema
@@ -519,197 +502,3 @@ def _cargar_procesos(
         tareas_por_producto[producto_id] = tareas_por_id
 
     return tareas_por_producto
-
-def _leer_fecha(valor, contexto):
-    """Interpreta una fecha ISO, con fechas sin zona asumidas en UTC."""
-    if not isinstance(valor, str):
-        raise ErrorConfiguracion(
-            f"{contexto}: la fecha debe ser un texto"
-        )
-
-    try:
-        fecha = datetime.fromisoformat(valor)
-    except ValueError as error:
-        raise ErrorConfiguracion(
-            f"{contexto}: fecha inválida '{valor}'"
-        ) from error
-
-    return fecha
-
-def _cargar_solicitudes(datos, sistema, elementos_por_id, tareas_por_producto,):
-    solicitudes_registradas = set()
-
-    for posicion, dato in enumerate(datos["solicitudes"]):
-        contexto = f"solicitudes[{posicion}]"
-
-        if not isinstance(dato, dict):
-            raise ErrorConfiguracion(
-                f"{contexto}: debe ser un objeto"
-            )
-
-        obligatorios = {"id", "producto_id", "cantidad", "periodos"}
-        permitidos = obligatorios | {"solicitante"}
-
-        if obligatorios - dato.keys() or dato.keys() - permitidos:
-            raise ErrorConfiguracion(
-                f"{contexto}: hay campos faltantes o desconocidos"
-            )
-
-        identificador = dato["id"]
-
-        if not isinstance(identificador, str) or not identificador.strip():
-            raise ErrorConfiguracion(
-                f"{contexto}: el id debe ser un texto no vacío"
-            )
-
-        if identificador in solicitudes_registradas:
-            raise ErrorConfiguracion(
-                f"{contexto}: ID duplicado '{identificador}'"
-            )
-
-        producto_id = dato["producto_id"]
-        producto = _buscar_referencia(
-            elementos_por_id, producto_id, contexto
-        )
-
-        tareas_por_id = tareas_por_producto.get(producto_id)
-
-        if tareas_por_id is None:
-            raise ErrorConfiguracion(
-                f"{contexto}: el producto no tiene proceso de manufactura"
-            )
-
-        periodos_por_producto = _leer_periodos_por_producto(dato["periodos"], producto_id, elementos_por_id, tareas_por_producto, contexto,)
-
-        solicitante = dato.get("solicitante", "Sin especificar")
-
-        if not isinstance(solicitante, str) or not solicitante.strip():
-            raise ErrorConfiguracion(
-                f"{contexto}: solicitante debe ser un texto no vacío"
-            )
-
-        try:
-            agregado = sistema.crear_orden_fabricacion(
-                identificador,
-                producto,
-                dato["cantidad"],
-                solicitante=solicitante,
-            )
-
-            if not agregado:
-                raise ErrorConfiguracion(
-                    f"{contexto}: la solicitud ya existe"
-                )
-
-            for producto_programado, periodos in (periodos_por_producto.items()):
-                sistema.programar_solicitud(identificador, periodos, producto=producto_programado,)
-
-        except MRPError as error:
-            raise ErrorConfiguracion(f"{contexto}: {error}") from error
-
-        solicitudes_registradas.add(identificador)
-
-def _leer_periodos_por_producto(filas, producto_principal_id, elementos_por_id, tareas_por_producto, contexto,):
-    if not isinstance(filas, list):
-        raise ErrorConfiguracion(
-            f"{contexto}: periodos debe ser una lista"
-        )
-
-    agrupados = {}
-
-    for indice, fila in enumerate(filas):
-        contexto_periodo = f"{contexto}.periodos[{indice}]"
-
-        obligatorios = {"tarea_id", "inicio", "fin"}
-        permitidos = obligatorios | {"producto_id"}
-
-        if (
-            not isinstance(fila, dict)
-            or obligatorios - fila.keys()
-            or fila.keys() - permitidos
-        ):
-            raise ErrorConfiguracion(
-                f"{contexto_periodo}: debe contener tarea_id, "
-                "inicio, fin y opcionalmente producto_id"
-            )
-
-        # Sin producto_id, corresponde al producto principal.
-        producto_id = fila.get(
-            "producto_id",
-            producto_principal_id,
-        )
-
-        _buscar_referencia(
-            elementos_por_id,
-            producto_id,
-            contexto_periodo,
-        )
-
-        tareas = _buscar_referencia(
-            tareas_por_producto,
-            producto_id,
-            contexto_periodo,
-        )
-
-        tarea_id = fila["tarea_id"]
-
-        _buscar_referencia(
-            tareas,
-            tarea_id,
-            contexto_periodo,
-        )
-
-        periodos_producto = agrupados.setdefault(
-            producto_id,
-            {},
-        )
-
-        if tarea_id in periodos_producto:
-            raise ErrorConfiguracion(
-                f"{contexto_periodo}: período repetido "
-                f"para '{producto_id}/{tarea_id}'"
-            )
-
-        inicio = _leer_fecha(
-            fila["inicio"],
-            contexto_periodo,
-        )
-        fin = _leer_fecha(
-            fila["fin"],
-            contexto_periodo,
-        )
-
-        try:
-            periodos_producto[tarea_id] = PeriodoOperacion(
-                inicio,
-                fin,
-            )
-        except MRPError as error:
-            raise ErrorConfiguracion(
-                f"{contexto_periodo}: {error}"
-            ) from error
-
-    if producto_principal_id not in agrupados:
-        raise ErrorConfiguracion(
-            f"{contexto}: faltan los períodos del producto principal"
-        )
-
-    resultado = {}
-
-    for producto_id, periodos_por_tarea in agrupados.items():
-        tareas = tareas_por_producto[producto_id]
-
-        if set(periodos_por_tarea) != set(tareas):
-            raise ErrorConfiguracion(
-                f"{contexto}: debe existir un período por tarea "
-                f"del producto '{producto_id}'"
-            )
-
-        producto = elementos_por_id[producto_id]
-
-        resultado[producto] = [
-            periodos_por_tarea[tarea_id]
-            for tarea_id in tareas
-        ]
-
-    return resultado

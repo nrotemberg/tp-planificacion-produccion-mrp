@@ -1,5 +1,5 @@
 import pickle
-from datetime import timedelta
+from datetime import datetime, timedelta
 from src.clases_auxiliares import ColaFIFO
 from src.manufactura import Colaborador, UnidadTrabajo, PeriodoOperacion
 from src.excepciones import EstadoSolicitudError, TipoInvalidoError
@@ -18,11 +18,11 @@ class SistemaMRP:
         self.inventario = Inventario()
         self.bom = GestorBOM()
         self.planes_materiales = {}
-        self._periodos_solicitudes = {}
         self._cantidades_a_fabricar = {}
         self._periodos_efectivos = {}
         self._planes_produccion = {}
         self._programaciones_produccion = {}
+        self._finalizaciones_estimadas = {}
         self._fabricaciones_realizadas = {}
         self._tareas_fabricacion = {}
 
@@ -65,11 +65,12 @@ class SistemaMRP:
             return False
 
         id_solicitud = self.cola_solicitudes.ver_primero()
-        if not self.reservar_recursos(id_solicitud):
+        solicitud = self.obtener_solicitud_por_id(id_solicitud)
+        if solicitud is None:
             return False
-
-        self.cola_solicitudes.desencolar()
-        return True
+        if solicitud.estado == "creada":
+            return self.reservar_recursos(id_solicitud)
+        return solicitud.estado in ("planificada", "en curso")
 
     def reservar_recursos(self, id_solicitud):
         solicitud = self.obtener_solicitud_por_id(id_solicitud)
@@ -93,10 +94,10 @@ class SistemaMRP:
         if not self.inventario.hay_stock(requerimientos):
             return False
 
+        solicitud.inicio_planificacion = datetime.now().astimezone()
+
         # Validar manufactura antes de modificar las reservas.
         programacion = self._calcular_programacion_plan(solicitud, plan,)
-
-        self._validar_conflictos_planes(solicitud.id, programacion,)
 
         self.inventario.reservar(requerimientos)
 
@@ -104,6 +105,14 @@ class SistemaMRP:
         self._planes_produccion[solicitud.id] = plan
         self._cantidades_a_fabricar[solicitud.id] = cantidad_a_fabricar
         self._programaciones_produccion[solicitud.id] = programacion
+        self._finalizaciones_estimadas[solicitud.id] = max(
+            (
+                periodo.fin
+                for periodos in programacion.values()
+                for periodo in periodos
+            ),
+            default=solicitud.inicio_planificacion,
+        )
 
         # Mantener la consulta existente del producto principal.
         self._periodos_efectivos[solicitud.id] = programacion.get(solicitud.producto, (),)
@@ -242,6 +251,11 @@ class SistemaMRP:
 
         solicitud.cambiar_estado()
         self.planes_materiales.pop(id_solicitud)
+        if (
+            self.cola_solicitudes
+            and self.cola_solicitudes.ver_primero() == id_solicitud
+        ):
+            self.cola_solicitudes.desencolar()
 
         return True
 
@@ -282,143 +296,6 @@ class SistemaMRP:
             return False
         solicitud.cambiar_estado()
         return True
-
-    def programar_solicitud(self, id_solicitud, periodos, producto=None,):
-        solicitud = self.obtener_solicitud_por_id(id_solicitud)
-
-        if solicitud is None or solicitud.estado != "creada":
-            raise EstadoSolicitudError(
-                "La solicitud debe existir y estar creada"
-            )
-
-        if producto is None:
-            producto = solicitud.producto
-
-        # Comprobar que el producto pertenece a la BOM del pedido.
-        pendientes = [solicitud.producto]
-        visitados = set()
-        encontrado = False
-
-        while pendientes:
-            elemento = pendientes.pop()
-
-            if elemento in visitados:
-                continue
-
-            visitados.add(elemento)
-
-            if elemento is producto:
-                encontrado = True
-                break
-
-            pendientes.extend(
-                componente.elemento_produccion
-                for componente in elemento.lista_elementos_bom
-            )
-
-        if not encontrado:
-            raise EstadoSolicitudError(
-                "El producto no pertenece a la BOM de la solicitud"
-            )
-
-        proceso = getattr(
-            producto,
-            "proceso_manufactura",
-            None,
-        )
-
-        if proceso is None or not proceso.tareas:
-            raise EstadoSolicitudError(
-                "El producto necesita un proceso con tareas"
-            )
-
-        if not isinstance(periodos, list) or any(
-            not isinstance(periodo, PeriodoOperacion)
-            for periodo in periodos
-        ):
-            raise TipoInvalidoError(
-                "Se requiere una lista de PeriodoOperacion"
-            )
-
-        if len(periodos) != len(proceso.tareas):
-            raise EstadoSolicitudError(
-                "Debe existir un período por tarea"
-            )
-
-        proceso.validar_recursos_programados(
-            solicitud.cantidad,
-            periodos,
-        )
-        self._validar_conflictos_programacion(
-            id_solicitud,
-            proceso.tareas,
-            periodos,
-        )
-
-        programacion = self._periodos_solicitudes.setdefault(id_solicitud, {})
-        programacion[producto] = tuple(periodos)
-
-    def obtener_periodos_solicitud(self, id_solicitud, producto=None,):
-        """Consulta los períodos del proceso de un producto del pedido."""
-        solicitud = self.obtener_solicitud_por_id(id_solicitud)
-
-        if solicitud is None:
-            return ()
-
-        if producto is None:
-            producto = solicitud.producto
-
-        programacion = self._periodos_solicitudes.get(id_solicitud, {},)
-
-        return programacion.get(producto, ())
-
-    def _validar_conflictos_programacion(self, id_solicitud, tareas, periodos,):
-        for otro_id, programaciones in self._periodos_solicitudes.items():
-            if otro_id == id_solicitud:
-                continue
-
-            otra_solicitud = self.obtener_solicitud_por_id(otro_id)
-            if otra_solicitud is None:
-                continue
-
-            for otro_producto, otros_periodos in programaciones.items():
-                otro_proceso = getattr(
-                    otro_producto,
-                    "proceso_manufactura",
-                    None,
-                )
-                if otro_proceso is None:
-                    continue
-
-                for tarea, periodo in zip(tareas, periodos):
-                    for otra_tarea, otro_periodo in zip(
-                        otro_proceso.tareas,
-                        otros_periodos,
-                    ):
-                        if not periodo.se_solapa_con(otro_periodo):
-                            continue
-
-                        if (
-                            tarea.unidad_trabajo is not None
-                            and tarea.unidad_trabajo is otra_tarea.unidad_trabajo
-                        ):
-                            raise EstadoSolicitudError(
-                                f"La unidad de trabajo "
-                                f"'{tarea.unidad_trabajo.nombre}' ya está "
-                                "programada en un período superpuesto"
-                            )
-
-                        colaboradores_comunes = [
-                            colaborador
-                            for colaborador in tarea.colaboradores_requeridos
-                            if colaborador in otra_tarea.colaboradores_requeridos
-                        ]
-                        if colaboradores_comunes:
-                            colaborador = next(iter(colaboradores_comunes))
-                            raise EstadoSolicitudError(
-                                f"El colaborador '{colaborador.nombre}' ya está "
-                                "programado en un período superpuesto"
-                            )
 
     def finalizar_produccion(self, id_solicitud):
         return self.consumir_stock(id_solicitud)
@@ -523,228 +400,109 @@ class SistemaMRP:
             for producto, periodos in programacion.items()
         }
 
-    def _validar_conflictos_planes(self, id_solicitud, programacion,):
-        """Comprueba recursos compartidos entre planes programados."""
-        programaciones = [
-            registrada
-            for otro_id, registrada
-            in self._programaciones_produccion.items()
-            if otro_id != id_solicitud
-        ]
-        programaciones.append(programacion)
-
-        intervalos_por_recurso = {}
-
-        for registrada in programaciones:
-            for producto, periodos in registrada.items():
-                proceso = producto.proceso_manufactura
-
-                for tarea, periodo in zip(proceso.tareas, periodos):
-                    recursos = list(tarea.colaboradores_requeridos)
-
-                    if tarea.unidad_trabajo is not None:
-                        recursos.append(tarea.unidad_trabajo)
-
-                    for recurso in recursos:
-                        intervalos_por_recurso.setdefault(
-                            recurso,
-                            [],
-                        ).append(
-                            (periodo.inicio, periodo.fin)
-                        )
-
-        for recurso, intervalos in intervalos_por_recurso.items():
-            intervalos.sort(key=lambda intervalo: intervalo[0])
-
-            for anterior, siguiente in zip(
-                intervalos,
-                intervalos[1:],
-            ):
-                if siguiente[0] < anterior[1]:
-                    raise EstadoSolicitudError(
-                        f"El recurso '{recurso.nombre}' "
-                        "tiene trabajos programados superpuestos"
-                    )
+    def obtener_fin_estimado(self, id_solicitud):
+        if id_solicitud not in self._finalizaciones_estimadas:
+            raise EstadoSolicitudError(
+                "La solicitud todavía no tiene una programación"
+            )
+        return self._finalizaciones_estimadas[id_solicitud]
 
     def _calcular_programacion_plan(self, solicitud, plan):
-        """Calcula los horarios de todos los productos a fabricar."""
+        """Genera períodos automáticos respetando BOM y recursos compartidos."""
         programacion = {}
+        ocupaciones = {}
+
+        for recurso in (*self.unidades_trabajo, *self.colaboradores):
+            ocupaciones[recurso] = list(recurso.periodos_ocupados)
+
+        for otro_id, registrada in self._programaciones_produccion.items():
+            if otro_id == solicitud.id:
+                continue
+            for producto, periodos in registrada.items():
+                for tarea, periodo in zip(
+                    producto.proceso_manufactura.tareas,
+                    periodos,
+                ):
+                    for recurso in self._recursos_de_tarea(tarea):
+                        ocupaciones.setdefault(recurso, []).append(periodo)
+
+        inicio_solicitud = solicitud.inicio_planificacion
 
         for producto in plan["orden_fabricacion"]:
             cantidad = plan["a_fabricar"][producto]
-
-            programacion[producto] = self._calcular_periodos_producto(
-                solicitud,
-                producto,
-                cantidad,
-            )
-
-        # Comprobar dependencias entre productos.
-        for producto, periodos in programacion.items():
-            inicio_producto = min(
-                periodo.inicio
-                for periodo in periodos
-            )
-
-            for componente in producto.lista_elementos_bom:
-                pieza = componente.elemento_produccion
-                periodos_pieza = programacion.get(pieza, ())
-
-                # Una pieza cubierta por stock no necesita fabricación.
-                if not periodos_pieza:
-                    continue
-
-                fin_pieza = max(
-                    periodo.fin
-                    for periodo in periodos_pieza
+            proceso = producto.proceso_manufactura
+            if proceso is None or not proceso.tareas:
+                raise EstadoSolicitudError(
+                    f"El producto '{producto.nombre}' necesita tareas de manufactura"
                 )
 
-                if fin_pieza > inicio_producto:
+            fin_componentes = max(
+                (
+                    periodo.fin
+                    for componente in producto.lista_elementos_bom
+                    for periodo in programacion.get(
+                        componente.elemento_produccion,
+                        (),
+                    )
+                ),
+                default=inicio_solicitud,
+            )
+            periodos_por_tarea = {}
+            periodos = []
+
+            for tarea in proceso.tareas:
+                if any(
+                    predecesora not in periodos_por_tarea
+                    for predecesora in tarea.subtareas
+                ):
                     raise EstadoSolicitudError(
-                        f"El proceso de '{producto.nombre}' "
-                        f"comienza antes de terminar '{pieza.nombre}'"
+                        f"Las predecesoras de '{tarea.nombre}' "
+                        "deben aparecer antes en el proceso"
                     )
 
-        # Reunir los intervalos de trabajo de cada recurso.
-        intervalos_por_recurso = {}
-
-        for producto, periodos in programacion.items():
-            proceso = producto.proceso_manufactura
-
-            for tarea, periodo in zip(proceso.tareas, periodos):
-                recursos = list(tarea.colaboradores_requeridos)
-
-                if tarea.unidad_trabajo is not None:
-                    recursos.append(tarea.unidad_trabajo)
-
+                inicio = max(
+                    (
+                        inicio_solicitud,
+                        fin_componentes,
+                        *(
+                            periodos_por_tarea[predecesora].fin
+                            for predecesora in tarea.subtareas
+                        ),
+                    )
+                )
+                recursos = self._recursos_de_tarea(tarea)
+                duracion = timedelta(hours=tarea.tiempo * cantidad)
                 for recurso in recursos:
-                    intervalos_por_recurso.setdefault(
+                    ocupaciones.setdefault(
                         recurso,
-                        [],
-                    ).append(
-                        (periodo.inicio, periodo.fin)
+                        list(recurso.periodos_ocupados),
                     )
 
-        # Comparar intervalos consecutivos ordenados por inicio.
-        for recurso, intervalos in intervalos_por_recurso.items():
-            intervalos.sort(key=lambda intervalo: intervalo[0])
+                while True:
+                    periodo = PeriodoOperacion(inicio, inicio + duracion)
+                    conflictos = [
+                        ocupado
+                        for recurso in recursos
+                        for ocupado in ocupaciones.get(recurso, ())
+                        if periodo.se_solapa_con(ocupado)
+                    ]
+                    if not conflictos:
+                        break
+                    inicio = min(conflictos, key=lambda ocupado: ocupado.fin).fin
 
-            for anterior, siguiente in zip(
-                intervalos,
-                intervalos[1:],
-            ):
-                if siguiente[0] < anterior[1]:
-                    raise EstadoSolicitudError(
-                        f"El recurso '{recurso.nombre}' tiene "
-                        "trabajos superpuestos dentro de la solicitud"
-                    )
+                periodos.append(periodo)
+                periodos_por_tarea[tarea] = periodo
+                for recurso in recursos:
+                    ocupaciones.setdefault(recurso, []).append(periodo)
+
+            proceso.validar_recursos_programados(cantidad, periodos)
+            programacion[producto] = tuple(periodos)
 
         return programacion
 
-    def _calcular_periodos_producto(self, solicitud, producto, cantidad,):
-        """Calcula los períodos efectivos de un producto sin reservar."""
-        if type(cantidad) is not int or cantidad < 0:
-            raise TipoInvalidoError(
-                "La cantidad a fabricar debe ser un entero no negativo"
-            )
-
-        if cantidad == 0:
-            return ()
-
-        proceso = getattr(
-            producto,
-            "proceso_manufactura",
-            None,
-        )
-
-        if proceso is None or not proceso.tareas:
-            raise EstadoSolicitudError(
-                f"El producto '{producto.nombre}' "
-                "necesita un proceso con tareas"
-            )
-
-        ventanas = self.obtener_periodos_solicitud(
-            solicitud.id,
-            producto,
-        )
-
-        if len(ventanas) != len(proceso.tareas):
-            raise EstadoSolicitudError(
-                f"Faltan períodos para el producto '{producto.nombre}'"
-            )
-
-        periodos = []
-
-        for tarea, ventana in zip(proceso.tareas, ventanas):
-            horas_necesarias = tarea.tiempo * cantidad
-
-            fin = ventana.inicio + timedelta(
-                hours=horas_necesarias
-            )
-
-            if fin > ventana.fin:
-                raise EstadoSolicitudError(
-                    f"El período de '{tarea.nombre}' "
-                    f"no alcanza para fabricar {cantidad} "
-                    f"unidades de '{producto.nombre}'"
-                )
-
-            periodos.append(
-                PeriodoOperacion(ventana.inicio, fin)
-            )
-
-        proceso.validar_recursos_programados(
-            cantidad,
-            periodos,
-        )
-
-        return tuple(periodos)
-
-    def _calcular_periodos_produccion(self, solicitud, cantidad):
-        # Si todo está disponible, no se reserva manufactura.
-        if cantidad == 0:
-            return []
-
-        proceso = getattr(
-            solicitud.producto,
-            "proceso_manufactura",
-            None,
-        )
-
-        # Conserva el comportamiento de los usos existentes sin proceso.
-        if proceso is None:
-            return []
-
-        ventanas = self.obtener_periodos_solicitud(solicitud.id)
-
-        if len(ventanas) != len(proceso.tareas):
-            raise EstadoSolicitudError(
-                "Faltan los períodos de la solicitud"
-            )
-
-        periodos = []
-
-        for tarea, ventana in zip(proceso.tareas, ventanas):
-            fin = ventana.inicio + timedelta(
-                hours=tarea.tiempo * cantidad
-            )
-
-            if fin > ventana.fin:
-                raise EstadoSolicitudError(
-                    f"El período de '{tarea.nombre}' no alcanza "
-                    f"para {cantidad} unidades"
-                )
-
-            periodos.append(
-                PeriodoOperacion(ventana.inicio, fin)
-            )
-
-        proceso.validar_recursos_programados(cantidad, periodos)
-
-        self._validar_conflictos_programacion(
-            solicitud.id,
-            proceso.tareas,
-            periodos,
-        )
-
-        return periodos
+    @staticmethod
+    def _recursos_de_tarea(tarea):
+        recursos = list(tarea.colaboradores_requeridos)
+        if tarea.unidad_trabajo is not None:
+            recursos.append(tarea.unidad_trabajo)
+        return recursos

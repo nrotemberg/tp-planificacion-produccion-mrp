@@ -11,6 +11,7 @@ class Solicitud:
         self.producto = producto
         self.cantidad = cantidad
         self.parametros = parametros
+        self.inicio_planificacion = None
 
 
     def cambiar_estado(self):

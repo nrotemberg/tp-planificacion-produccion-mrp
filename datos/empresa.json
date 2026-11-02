@@ -1,21 +1,19 @@
 {
-  "version": 1,
+  "version": 3,
   "elementos": [
     {
       "id": "madera",
       "tipo": "insumo",
       "nombre": "Madera",
       "unidad_medida": "m2",
-      "costo": 50,
-      "stock_actual": 100
+      "costo": 50
     },
     {
       "id": "tornillos",
       "tipo": "insumo",
       "nombre": "Tornillos",
       "unidad_medida": "unidad",
-      "costo": 2,
-      "stock_actual": 100
+      "costo": 2
     },
     {
       "id": "pata",
@@ -23,7 +21,6 @@
       "nombre": "Pata",
       "unidad_medida": "unidad",
       "costo": 1,
-      "stock_actual": 3,
       "bom": [
         {
           "elemento_id": "madera",
@@ -37,7 +34,6 @@
       "nombre": "Tabla",
       "unidad_medida": "unidad",
       "costo": 1,
-      "stock_actual": 0,
       "bom": [
         {
           "elemento_id": "madera",
@@ -51,7 +47,6 @@
       "nombre": "Mesa",
       "unidad_medida": "unidad",
       "costo": 1,
-      "stock_actual": 5,
       "bom": [
         {
           "elemento_id": "pata",
@@ -135,86 +130,6 @@
           "colaboradores_ids": ["ana"],
           "habilidades_requeridas": ["armado"],
           "predecesoras_ids": []
-        }
-      ]
-    }
-  ],
-  "solicitudes": [
-    {
-      "id": "SOL-STOCK-SUFICIENTE",
-      "producto_id": "mesa",
-      "cantidad": 2,
-      "solicitante": "Sucursal Centro",
-      "periodos": [
-        {
-          "producto_id": "pata",
-          "tarea_id": "fabricar_pata",
-          "inicio": "2026-11-02T08:00:00",
-          "fin": "2026-11-02T09:00:00"
-        },
-        {
-          "producto_id": "tabla",
-          "tarea_id": "fabricar_tabla",
-          "inicio": "2026-11-02T09:00:00",
-          "fin": "2026-11-02T10:00:00"
-        },
-        {
-          "producto_id": "mesa",
-          "tarea_id": "ensamblar_mesa",
-          "inicio": "2026-11-02T10:00:00",
-          "fin": "2026-11-02T11:00:00"
-        }
-      ]
-    },
-    {
-      "id": "SOL-STOCK-PARCIAL",
-      "producto_id": "mesa",
-      "cantidad": 4,
-      "solicitante": "Sucursal Norte",
-      "periodos": [
-        {
-          "producto_id": "pata",
-          "tarea_id": "fabricar_pata",
-          "inicio": "2026-11-03T08:00:00",
-          "fin": "2026-11-03T09:00:00"
-        },
-        {
-          "producto_id": "tabla",
-          "tarea_id": "fabricar_tabla",
-          "inicio": "2026-11-03T09:00:00",
-          "fin": "2026-11-03T10:00:00"
-        },
-        {
-          "producto_id": "mesa",
-          "tarea_id": "ensamblar_mesa",
-          "inicio": "2026-11-03T10:00:00",
-          "fin": "2026-11-03T10:30:00"
-        }
-      ]
-    },
-    {
-      "id": "SOL-SIN-STOCK",
-      "producto_id": "mesa",
-      "cantidad": 1,
-      "solicitante": "Sucursal Sur",
-      "periodos": [
-        {
-          "producto_id": "pata",
-          "tarea_id": "fabricar_pata",
-          "inicio": "2026-11-04T08:00:00",
-          "fin": "2026-11-04T09:00:00"
-        },
-        {
-          "producto_id": "tabla",
-          "tarea_id": "fabricar_tabla",
-          "inicio": "2026-11-04T09:00:00",
-          "fin": "2026-11-04T10:00:00"
-        },
-        {
-          "producto_id": "mesa",
-          "tarea_id": "ensamblar_mesa",
-          "inicio": "2026-11-04T10:00:00",
-          "fin": "2026-11-04T10:30:00"
         }
       ]
     }

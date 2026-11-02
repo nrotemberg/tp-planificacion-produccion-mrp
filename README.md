@@ -28,8 +28,8 @@ El sistema ha sido modelado utilizando Programación Orientada a Objetos (POO), 
 
 ### 3. Gestión de Recursos y Tiempos
 * **`UnidadTrabajo`**: Estaciones de trabajo. Poseen capacidades máximas de producción, límites de colaboradores y costos fijos.
-* **`Colaborador`**: Empleados de la planta con un costo por hora y disponibilidad ligada a períodos de trabajo.
-* **`PeriodoOperacion`**: Bloques temporales (inicio y fin) que controlan cuándo un recurso o colaborador está disponible.
+* **`Colaborador`**: Empleados con costo por hora, habilidades y períodos ocupados.
+* **`PeriodoOperacion`**: Intervalos calculados para las tareas planificadas; permiten detectar ocupaciones superpuestas.
 
 
 ### 4. Flujo de Solicitudes
@@ -40,7 +40,7 @@ La explosión de la BOM se concentra en `bom.py`, dentro de la clase `GestorBOM`
 Su método `explotar` recorre todos los niveles y devuelve un diccionario plano
 de insumos y cantidades requeridas.
 
-`Inventario`, definido en `inventario.py`, utiliza esos requerimientos para verificar, reservar y consumir stock. El stock no pertenece a `ElementoProduccion`: se guarda en `Inventario.stock`, usando cada elemento como clave y registrando las cantidades `actual` y `reservado`. `SistemaMRP` carga el stock inicial al agregar cada elemento y coordina el flujo de la solicitud sin repetir la lógica recursiva.
+`Inventario`, definido en `inventario.py`, utiliza esos requerimientos para verificar, reservar y consumir stock. El stock no pertenece a `ElementoProduccion`: se guarda en `Inventario.stock`, usando cada elemento como clave y registrando las cantidades `actual` y `reservado`. `SistemaMRP` coordina el flujo de la solicitud sin repetir la lógica recursiva; la persistencia del inventario y los pedidos queda en el archivo de estado.
 
 El flujo básico se mantiene:
 
@@ -48,13 +48,22 @@ El flujo básico se mantiene:
 creada -> planificada -> en curso -> finalizada
 ```
 
-Una solicitud sólo reserva materiales cuando está creada, sólo inicia producción cuando está planificada y sólo consume stock cuando está en curso.
+Una solicitud sólo reserva materiales cuando está creada, sólo inicia producción cuando está planificada y sólo consume stock cuando está en curso. El menú procesa una solicitud completa por vez, desde el frente de la cola FIFO; si no se puede planificar, permanece en la cola para reintentar.
 
-Al cargar una programación desde JSON, cada período debe cubrir el tiempo
-necesario para la cantidad solicitada. Además, una tarea no puede comenzar
-antes de que terminen sus predecesoras y los colaboradores o unidades de
-trabajo no pueden quedar asignados a períodos superpuestos, ni dentro de un
-proceso ni entre solicitudes programadas.
+Al crear una solicitud se elige un producto final, se indica la cantidad y el solicitante. Los productos intermedios que forman parte de la BOM no aparecen como pedidos independientes. Al procesar la solicitud, el sistema toma la fecha y hora actual, calcula cuántas unidades debe fabricar según el stock disponible y genera automáticamente los períodos de las tareas. Cada tarea dura `tiempo × cantidad`; respeta sus predecesoras y los productos requeridos por la BOM. Tareas que usan recursos distintos pueden superponerse; si comparten una unidad de trabajo o un colaborador, se ubican una después de la otra. El calendario es continuo (24/7), sin turnos ni pausas, y se informa la hora estimada de finalización.
+
+La configuración fija usa el formato JSON versión 3 y vive en
+`datos/empresa.json`: define elementos, colaboradores, unidades de trabajo y
+procesos. El inventario y las solicitudes se guardan por separado en
+`datos/empresa_estado.json`, para no mezclar la definición de la empresa con
+los datos que cambian durante el uso. Si el archivo de estado no existe, el
+sistema lo crea con inventario vacío y sin solicitudes. Al salir y
+después de cada acción del menú, el estado se guarda; al volver a iniciar, se
+restauran el inventario, la cola FIFO y el progreso de las solicitudes.
+
+Para usar otro archivo de configuración, se busca el estado junto a él con el
+mismo nombre base y el sufijo `_estado.json`. Las solicitudes se crean desde
+el menú y no se cargan en la configuración fija.
 
 
 ## Reglas de Negocio Clave

@@ -21,7 +21,7 @@ RUTA_CONFIGURACION_EJEMPLO = (
 @pytest.fixture
 def configuracion():
     return {
-        "version": 1,
+        "version": 3,
         "elementos": [
             {
                 "id": "madera",
@@ -29,7 +29,6 @@ def configuracion():
                 "nombre": "Madera",
                 "unidad_medida": "m2",
                 "costo": 50,
-                "stock_actual": 100,
             },
             {
                 "id": "mesa",
@@ -37,7 +36,6 @@ def configuracion():
                 "nombre": "Mesa",
                 "unidad_medida": "unidad",
                 "costo": 1,
-                "stock_actual": 0,
                 "bom": [
                     {
                         "elemento_id": "madera",
@@ -79,22 +77,6 @@ def configuracion():
                 ],
             }
         ],
-        "solicitudes": [
-            {
-                "id": "SOL-1",
-                "solicitante": "Cliente",
-                "producto_id": "mesa",
-                "cantidad": 2,
-                "periodos": [
-                    {
-                        "producto_id": "mesa",
-                        "tarea_id": "armado",
-                        "inicio": "2026-11-03T08:00:00",
-                        "fin": "2026-11-03T10:00:00",
-                    }
-                ],
-            }
-        ],
     }
 
 def escribir_configuracion(tmp_path, configuracion):
@@ -103,7 +85,7 @@ def escribir_configuracion(tmp_path, configuracion):
 	return ruta
 
 
-def test_carga_y_programa_la_configuracion_de_ejemplo(
+def test_carga_solo_configuracion_estatica(
     tmp_path,
     configuracion,
 ):
@@ -113,9 +95,10 @@ def test_carga_y_programa_la_configuracion_de_ejemplo(
     assert set(sistema.elementos_produccion) == {"Madera", "Mesa"}
     assert len(sistema.colaboradores) == 1
     assert len(sistema.unidades_trabajo) == 1
-    assert list(sistema.solicitudes) == ["SOL-1"]
-    assert len(sistema.obtener_periodos_solicitud("SOL-1")) == 1
-    assert sistema.obtener_solicitud_por_id("SOL-1").estado == "creada"
+    assert sistema.solicitudes == {}
+    assert sistema.inventario.obtener_stock(
+        sistema.elementos_produccion["Mesa"]
+    ) == {"actual": 0, "reservado": 0}
 
 
 def test_rechaza_secciones_faltantes_y_campos_desconocidos(
@@ -123,9 +106,9 @@ def test_rechaza_secciones_faltantes_y_campos_desconocidos(
 	configuracion,
 ):
 	configuracion_incompleta = copy.deepcopy(configuracion)
-	del configuracion_incompleta["solicitudes"]
+	del configuracion_incompleta["procesos"]
 
-	with pytest.raises(ErrorConfiguracion, match="Falta la sección 'solicitudes'"):
+	with pytest.raises(ErrorConfiguracion, match="Falta la sección 'procesos'"):
 		leer_configuracion(
 			escribir_configuracion(tmp_path, configuracion_incompleta)
 		)
@@ -140,9 +123,9 @@ def test_rechaza_secciones_faltantes_y_campos_desconocidos(
 
 
 def test_rechaza_version_incompatible(tmp_path, configuracion):
-	configuracion["version"] = 2
+	configuracion["version"] = 4
 
-	with pytest.raises(ErrorConfiguracion, match="versión igual a 1"):
+	with pytest.raises(ErrorConfiguracion, match="versión igual a 3"):
 		cargar_sistema_desde_json(
 			escribir_configuracion(tmp_path, configuracion)
 		)
@@ -169,16 +152,16 @@ def test_rechaza_referencias_a_elementos_inexistentes(
 		)
 
 
-def test_rechaza_fechas_de_periodo_invalidas(tmp_path, configuracion):
-	configuracion["solicitudes"][0]["periodos"][0]["inicio"] = "mañana"
+def test_rechaza_solicitudes_en_configuracion_estatica(tmp_path, configuracion):
+	configuracion["solicitudes"] = []
 
-	with pytest.raises(ErrorConfiguracion, match="fecha inválida"):
+	with pytest.raises(ErrorConfiguracion, match="Campos desconocidos"):
 		cargar_sistema_desde_json(
 			escribir_configuracion(tmp_path, configuracion)
 		)
 
 
-def test_rechaza_tarea_programada_antes_de_su_predecesora(
+def test_programa_tarea_despues_de_su_predecesora(
 	tmp_path,
 	configuracion,
 ):
@@ -193,34 +176,17 @@ def test_rechaza_tarea_programada_antes_de_su_predecesora(
 			"predecesoras_ids": ["armado"],
 		}
 	)
-	configuracion["solicitudes"][0]["periodos"] = [
-		{
-			"tarea_id": "armado",
-			"inicio": "2026-10-26T10:00:00",
-			"fin": "2026-10-26T12:00:00",
-		},
-		{
-			"tarea_id": "terminacion",
-			"inicio": "2026-10-26T08:00:00",
-			"fin": "2026-10-26T10:00:00",
-		},
+	sistema = cargar_sistema_desde_json(
+		escribir_configuracion(tmp_path, configuracion)
+	)
+	assert sistema.crear_orden_fabricacion(
+		"SOL-1", sistema.elementos_produccion["Mesa"], 1
+	)
+	sistema.inventario.agregar_stock(
+		sistema.elementos_produccion["Madera"], 2
+	)
+	assert sistema.procesar_siguiente_solicitud()
+	periodos = sistema.obtener_programacion_produccion("SOL-1")[
+		sistema.elementos_produccion["Mesa"]
 	]
-
-	with pytest.raises(ErrorConfiguracion, match="no puede iniciar antes"):
-		cargar_sistema_desde_json(
-			escribir_configuracion(tmp_path, configuracion)
-		)
-
-
-def test_rechaza_solicitudes_con_recursos_programados_en_periodos_superpuestos(
-	tmp_path,
-	configuracion,
-):
-	segunda_solicitud = copy.deepcopy(configuracion["solicitudes"][0])
-	segunda_solicitud["id"] = "SOL-2"
-	configuracion["solicitudes"].append(segunda_solicitud)
-
-	with pytest.raises(ErrorConfiguracion, match="período superpuesto"):
-		cargar_sistema_desde_json(
-			escribir_configuracion(tmp_path, configuracion)
-		)
+	assert periodos[1].inicio >= periodos[0].fin

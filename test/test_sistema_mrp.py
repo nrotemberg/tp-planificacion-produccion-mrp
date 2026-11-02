@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 from src.manufactura import (
+    Colaborador,
     PeriodoOperacion,
     ProcesoManufactura,
     TareaDefinida,
@@ -78,16 +79,6 @@ def crear_sistema():
     sistema.agregar_elemento(madera, 10)
     sistema.agregar_elemento(mesa)
     sistema.crear_solicitud(solicitud)
-
-    sistema.programar_solicitud(
-        solicitud.id,
-        [
-            PeriodoOperacion(
-                datetime(2026, 11, 3, 8, 0),
-                datetime(2026, 11, 3, 10, 0),
-            )
-        ],
-    )
 
     return sistema, solicitud, madera, mesa
 
@@ -191,6 +182,78 @@ def test_reservar_recursos_planifica_la_solicitud_en_el_sistema():
     sistema, _, _, _ = crear_sistema()
     assert sistema.reservar_recursos(1) is True
 
+
+def test_programa_en_paralelo_tareas_con_recursos_distintos():
+    madera = Insumo("Madera", "unidad", 1)
+    mesa = Producto("Mesa", "unidad", 1)
+    mesa.agregar_a_BOM(ComponenteBOM(madera, 1))
+    proceso = ProcesoManufactura(mesa)
+
+    for indice in (1, 2):
+        colaborador = Colaborador(f"Colaborador {indice}", 1, [])
+        unidad = UnidadTrabajo(f"Unidad {indice}", 10, 1, 1)
+        tarea = TareaDefinida(
+            f"Tarea {indice}",
+            1,
+            unidad,
+            [colaborador],
+            [],
+        )
+        proceso.agregar_tarea(tarea)
+
+    sistema = SistemaMRP()
+    sistema.agregar_elemento(madera, 10)
+    sistema.agregar_elemento(mesa)
+    solicitud = Solicitud(
+        "SOL-PARALELO",
+        "Deposito",
+        mesa,
+        2,
+    )
+    sistema.crear_solicitud(solicitud)
+
+    assert sistema.reservar_recursos(solicitud.id) is True
+    periodos = sistema.obtener_programacion_produccion(solicitud.id)[mesa]
+    assert periodos[0].inicio == periodos[1].inicio
+    assert periodos[0].fin == periodos[1].fin
+    assert sistema.obtener_fin_estimado(solicitud.id) == periodos[0].fin
+
+
+def test_serializa_tareas_que_comparten_colaborador():
+    madera = Insumo("Madera", "unidad", 1)
+    mesa = Producto("Mesa", "unidad", 1)
+    mesa.agregar_a_BOM(ComponenteBOM(madera, 1))
+    proceso = ProcesoManufactura(mesa)
+    colaborador = Colaborador("Ana", 1, [])
+
+    for indice in (1, 2):
+        tarea = TareaDefinida(
+            f"Tarea {indice}",
+            1,
+            UnidadTrabajo(f"Unidad {indice}", 10, 1, 1),
+            [colaborador],
+            [],
+        )
+        proceso.agregar_tarea(tarea)
+
+    sistema = SistemaMRP()
+    sistema.agregar_elemento(madera, 10)
+    sistema.agregar_elemento(mesa)
+    solicitud = Solicitud(
+        "SOL-SERIAL",
+        "Deposito",
+        mesa,
+        2,
+    )
+    sistema.crear_solicitud(solicitud)
+
+    assert sistema.reservar_recursos(solicitud.id) is True
+    primero, segundo = sistema.obtener_programacion_produccion(
+        solicitud.id
+    )[mesa]
+    assert segundo.inicio == primero.fin
+
+
 def test_iniciar_y_finalizar_produccion_consumen_stock():
     sistema, solicitud, madera, mesa = crear_sistema()
 
@@ -278,28 +341,6 @@ def test_bom_anidada_reserva_el_stock_de_los_insumos():
     sistema.agregar_elemento(base)
     sistema.agregar_elemento(mesa)
     sistema.crear_solicitud(solicitud)
-
-    sistema.programar_solicitud(
-        solicitud.id,
-        [
-            PeriodoOperacion(
-                datetime(2026, 11, 3, 8),
-                datetime(2026, 11, 3, 12),
-            )
-        ],
-        producto=base,
-    )
-
-    sistema.programar_solicitud(
-        solicitud.id,
-        [
-            PeriodoOperacion(
-                datetime(2026, 11, 3, 12),
-                datetime(2026, 11, 3, 14),
-            )
-        ],
-        producto=mesa,
-    )
 
     assert sistema.reservar_recursos(1) is True
 
@@ -414,28 +455,6 @@ def test_reservar_y_consumir_stock_intermedio():
     sistema.agregar_elemento(ranger)
     sistema.crear_solicitud(solicitud)
 
-    sistema.programar_solicitud(
-        solicitud.id,
-        [
-            PeriodoOperacion(
-                datetime(2026, 11, 3, 8),
-                datetime(2026, 11, 3, 11),
-            )
-        ],
-        producto=v6,
-    )
-
-    sistema.programar_solicitud(
-        solicitud.id,
-        [
-            PeriodoOperacion(
-                datetime(2026, 11, 3, 11),
-                datetime(2026, 11, 3, 16),
-            )
-        ],
-        producto=ranger,
-    )
-
     assert sistema.reservar_recursos(1) is True
 
     # Se aprovechan cuatro motores existentes y se fabrican seis.
@@ -510,12 +529,13 @@ def test_procesar_solicitudes_respeta_el_orden_fifo():
     mesa.agregar_a_BOM(ComponenteBOM(madera, 1))
 
     proceso = ProcesoManufactura(mesa)
+    colaborador = Colaborador("Ana", 1, [])
     proceso.agregar_tarea(
         TareaDefinida(
             nombre="Fabricar mesa",
             tiempo=1,
-            unidad_trabajo=None,
-            colaboradores_requeridos=[],
+            unidad_trabajo=UnidadTrabajo("Banco", 10, 1, 1),
+            colaboradores_requeridos=[colaborador],
             habilidades_requeridas=[],
         )
     )
@@ -523,18 +543,14 @@ def test_procesar_solicitudes_respeta_el_orden_fifo():
     sistema.agregar_elemento(madera, 10)
     sistema.agregar_elemento(mesa)
 
-    for identificador, hora_inicio in ((1, 8), (2, 10)):
+    for identificador in (1, 2):
         sistema.crear_solicitud(
-            Solicitud(identificador, "Deposito", mesa, 2)
-        )
-        sistema.programar_solicitud(
-            identificador,
-            [
-                PeriodoOperacion(
-                    datetime(2026, 11, 3, hora_inicio),
-                    datetime(2026, 11, 3, hora_inicio + 2),
-                )
-            ],
+            Solicitud(
+                identificador,
+                "Deposito",
+                mesa,
+                2,
+            )
         )
 
     assert len(sistema.cola_solicitudes) == 2
@@ -544,16 +560,28 @@ def test_procesar_solicitudes_respeta_el_orden_fifo():
 
     assert sistema.obtener_solicitud_por_id(1).estado == "planificada"
     assert sistema.obtener_solicitud_por_id(2).estado == "creada"
-    assert len(sistema.cola_solicitudes) == 1
+    assert len(sistema.cola_solicitudes) == 2
+    assert sistema.cola_solicitudes.ver_primero() == 1
+
+    sistema.iniciar_produccion(1)
+    assert sistema.fabricar_siguiente_producto(1) == (mesa, 2)
+    fin_primera_solicitud = sistema.obtener_fin_estimado(1)
+    assert sistema.finalizar_produccion(1) is True
     assert sistema.cola_solicitudes.ver_primero() == 2
 
     assert sistema.procesar_siguiente_solicitud() is True
 
     assert sistema.obtener_solicitud_por_id(2).estado == "planificada"
+    assert len(sistema.cola_solicitudes) == 1
+    inicio_segunda = sistema.obtener_programacion_produccion(2)[mesa][0].inicio
+    assert inicio_segunda >= fin_primera_solicitud
+    sistema.iniciar_produccion(2)
+    assert sistema.fabricar_siguiente_producto(2) == (mesa, 2)
+    assert sistema.finalizar_produccion(2) is True
     assert len(sistema.cola_solicitudes) == 0
     assert sistema.inventario.obtener_stock(madera) == {
-        "actual": 10,
-        "reservado": 4,
+        "actual": 6,
+        "reservado": 0,
     }
 
     assert sistema.procesar_siguiente_solicitud() is False
@@ -563,6 +591,16 @@ def test_solicitud_no_se_quita_de_la_cola_si_no_puede_planificarse():
     madera = Insumo("Madera", "unidad", 5)
     mesa = Producto("Mesa", "unidad", 1)
     mesa.agregar_a_BOM(ComponenteBOM(madera, 1))
+    proceso = ProcesoManufactura(mesa)
+    proceso.agregar_tarea(
+        TareaDefinida(
+            "Fabricar mesa",
+            1,
+            None,
+            [],
+            [],
+        )
+    )
     sistema.agregar_elemento(madera, 0)
     sistema.agregar_elemento(mesa)
     sistema.crear_solicitud(Solicitud(1, "Deposito", mesa, 2))
@@ -571,6 +609,15 @@ def test_solicitud_no_se_quita_de_la_cola_si_no_puede_planificarse():
     assert len(sistema.cola_solicitudes) == 1
     assert sistema.cola_solicitudes.ver_primero() == 1
     assert sistema.obtener_solicitud_por_id(1).estado == "creada"
+
+    sistema.inventario.agregar_stock(madera, 2)
+    assert sistema.procesar_siguiente_solicitud() is True
+    assert sistema.cola_solicitudes.ver_primero() == 1
+    assert sistema.obtener_solicitud_por_id(1).estado == "planificada"
+    sistema.iniciar_produccion(1)
+    assert sistema.fabricar_siguiente_producto(1) == (mesa, 2)
+    assert sistema.finalizar_produccion(1) is True
+    assert len(sistema.cola_solicitudes) == 0
 
 def test_guardar_y_cargar_pickle_preserva_el_sistema(tmp_path):
     sistema, solicitud, madera, mesa = crear_sistema()
