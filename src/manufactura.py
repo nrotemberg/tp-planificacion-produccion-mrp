@@ -177,8 +177,10 @@ class TareaDefinida:
             raise TipoInvalidoError("El nombre de la tarea debe ser un texto no vacío")
         if isinstance(tiempo, bool) or not isinstance(tiempo, (int, float)):
             raise TipoInvalidoError("El tiempo de la tarea debe ser numérico")
-        if tiempo <= 0:
-            raise CantidadInvalidaError("El tiempo de la tarea debe ser mayor que cero")
+        if (isinstance(tiempo, float) and not math.isfinite(tiempo)) or tiempo <= 0:
+            raise CantidadInvalidaError(
+                "El tiempo de la tarea debe ser finito y mayor que cero"
+            )
         if unidad_trabajo is not None and not isinstance(unidad_trabajo, UnidadTrabajo):
             raise TipoInvalidoError("La unidad de trabajo debe ser una UnidadTrabajo")
         if colaboradores_requeridos is not None:

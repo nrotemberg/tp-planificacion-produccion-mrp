@@ -1,4 +1,7 @@
+import pytest
+
 from src.elementos import Insumo
+from src.excepciones import CantidadInvalidaError, StockInsuficienteError
 from src.inventario import Inventario
 
 
@@ -82,3 +85,88 @@ def test_consumir_varios_elementos():
     assert inventario.stock[madera]["reservado"] == 0
     assert inventario.stock[clavos]["actual"] == 15
     assert inventario.stock[clavos]["reservado"] == 0
+
+
+@pytest.mark.parametrize(
+    "stock_actual, stock_reservado",
+    [
+        (-1, 0),
+        (1, -1),
+        (1, 2),
+        (True, 0),
+        (1, 0.5),
+    ],
+)
+def test_registrar_rechaza_stock_invalido(stock_actual, stock_reservado):
+    inventario = Inventario()
+    madera = Insumo("Madera", "unidad", 5)
+
+    with pytest.raises(CantidadInvalidaError):
+        inventario.registrar(madera, stock_actual, stock_reservado)
+
+    assert madera not in inventario.stock
+
+
+@pytest.mark.parametrize("cantidad", [0, -1, True, 1.5])
+def test_agregar_stock_rechaza_cantidades_invalidas(cantidad):
+    inventario = Inventario()
+    madera = Insumo("Madera", "unidad", 5)
+    inventario.registrar(madera, 10)
+
+    with pytest.raises(CantidadInvalidaError):
+        inventario.agregar_stock(madera, cantidad)
+
+    assert inventario.obtener_stock(madera) == {
+        "actual": 10,
+        "reservado": 0,
+    }
+
+
+@pytest.mark.parametrize("cantidad", [0, -1, True, 1.5])
+def test_hay_stock_rechaza_requerimientos_invalidos(cantidad):
+    inventario = Inventario()
+    madera = Insumo("Madera", "unidad", 5)
+    inventario.registrar(madera, 10)
+
+    with pytest.raises(CantidadInvalidaError):
+        inventario.hay_stock({madera: cantidad})
+
+
+def test_reservar_rechaza_stock_insuficiente_sin_cambios_parciales():
+    inventario = Inventario()
+    madera = Insumo("Madera", "unidad", 5)
+    clavos = Insumo("Clavos", "unidad", 1)
+    inventario.registrar(madera, 10)
+    inventario.registrar(clavos, 2)
+
+    with pytest.raises(StockInsuficienteError):
+        inventario.reservar({madera: 4, clavos: 3})
+
+    assert inventario.obtener_stock(madera) == {
+        "actual": 10,
+        "reservado": 0,
+    }
+    assert inventario.obtener_stock(clavos) == {
+        "actual": 2,
+        "reservado": 0,
+    }
+
+
+def test_consumir_rechaza_stock_no_reservado_sin_cambios_parciales():
+    inventario = Inventario()
+    madera = Insumo("Madera", "unidad", 5)
+    clavos = Insumo("Clavos", "unidad", 1)
+    inventario.registrar(madera, 10, 4)
+    inventario.registrar(clavos, 20, 2)
+
+    with pytest.raises(StockInsuficienteError):
+        inventario.consumir({madera: 4, clavos: 3})
+
+    assert inventario.obtener_stock(madera) == {
+        "actual": 10,
+        "reservado": 4,
+    }
+    assert inventario.obtener_stock(clavos) == {
+        "actual": 20,
+        "reservado": 2,
+    }
