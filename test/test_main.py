@@ -13,6 +13,7 @@ from src.persistencia_json import cargar_estado, guardar_estado
 from main import (
     _productos_fabricables,
     crear_solicitud,
+    ejecutar_flujo,
     mostrar_cuellos_de_botella,
     mostrar_colaboradores,
     mostrar_historial_tareas,
@@ -67,6 +68,23 @@ def test_no_crea_solicitud_si_cantidad_supera_capacidad_de_ut(
         crear_solicitud(sistema)
 
     assert sistema.solicitudes == {}
+
+
+def test_procesar_solicitud_muestra_insumos_faltantes(capsys):
+    sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+    solicitud = sistema.crear_orden_fabricacion(
+        "SOL-1",
+        sistema.elementos_produccion["Mesa"],
+        1,
+    )
+    assert solicitud
+
+    ejecutar_flujo(sistema)
+
+    salida = capsys.readouterr().out
+    assert "Insumos faltantes:" in salida
+    assert "- Madera: 6 m2" in salida
+    assert "- Tornillos: 8 unidad" in salida
 
 
 def test_carga_stock_guardado_en_estado(tmp_path):

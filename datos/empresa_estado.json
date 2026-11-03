@@ -2,11 +2,11 @@
   "version": 1,
   "inventario": {
     "Madera": {
-      "actual": 60,
+      "actual": 23,
       "reservado": 10
     },
     "Tornillos": {
-      "actual": 10,
+      "actual": 20,
       "reservado": 10
     },
     "Pata": {
@@ -22,7 +22,242 @@
       "reservado": 1
     }
   },
-  "solicitudes": [],
-  "cola": [],
-  "planes": {}
+  "solicitudes": [
+    {
+      "id": "SOL-1",
+      "producto": "Mesa",
+      "cantidad": 1,
+      "solicitante": "nico",
+      "estado": "finalizada",
+      "inicio": "2026-11-03T17:29:51.982126-03:00"
+    },
+    {
+      "id": "SOL-2",
+      "producto": "Pata",
+      "cantidad": 19,
+      "solicitante": "eli",
+      "estado": "finalizada",
+      "inicio": "2026-11-03T17:40:28.632734-03:00"
+    },
+    {
+      "id": "SOL-3",
+      "producto": "Pata",
+      "cantidad": 19,
+      "solicitante": "eli",
+      "estado": "finalizada",
+      "inicio": "2026-11-03T17:40:46.958373-03:00"
+    },
+    {
+      "id": "SOL-4",
+      "producto": "Pata",
+      "cantidad": 19,
+      "solicitante": "eli",
+      "estado": "finalizada",
+      "inicio": "2026-11-03T17:41:10.528694-03:00"
+    },
+    {
+      "id": "SOL-5",
+      "producto": "Mesa",
+      "cantidad": 4,
+      "solicitante": "nkdsvc",
+      "estado": "finalizada",
+      "inicio": "2026-11-03T17:42:01.889425-03:00"
+    },
+    {
+      "id": "SOL-6",
+      "producto": "Mesa",
+      "cantidad": 4,
+      "solicitante": "dsf",
+      "estado": "creada",
+      "inicio": null
+    }
+  ],
+  "cola": [
+    "SOL-6"
+  ],
+  "planes": {
+    "SOL-1": {
+      "insumos": {
+        "Madera": 6,
+        "Tornillos": 8
+      },
+      "desde_stock": {},
+      "a_fabricar": {
+        "Mesa": 1,
+        "Pata": 4,
+        "Tabla": 1
+      },
+      "orden_fabricacion": [
+        "Pata",
+        "Tabla",
+        "Mesa"
+      ],
+      "materiales": [
+        {},
+        {}
+      ],
+      "cantidad_a_fabricar": 1,
+      "programacion": {
+        "Pata": [
+          {
+            "inicio": "2026-11-03T20:29:51.982126+00:00",
+            "fin": "2026-11-03T21:29:51.982126+00:00"
+          }
+        ],
+        "Tabla": [
+          {
+            "inicio": "2026-11-03T21:29:51.982126+00:00",
+            "fin": "2026-11-03T22:29:51.982126+00:00"
+          }
+        ],
+        "Mesa": [
+          {
+            "inicio": "2026-11-03T22:29:51.982126+00:00",
+            "fin": "2026-11-03T22:59:51.982126+00:00"
+          }
+        ]
+      },
+      "productos_fabricados": [
+        "Mesa",
+        "Pata",
+        "Tabla"
+      ],
+      "fin_estimado": "2026-11-03T22:59:51.982126+00:00"
+    },
+    "SOL-2": {
+      "insumos": {
+        "Madera": 19
+      },
+      "desde_stock": {},
+      "a_fabricar": {
+        "Pata": 19
+      },
+      "orden_fabricacion": [
+        "Pata"
+      ],
+      "materiales": [
+        {},
+        {}
+      ],
+      "cantidad_a_fabricar": 19,
+      "programacion": {
+        "Pata": [
+          {
+            "inicio": "2026-11-03T22:59:51.982126+00:00",
+            "fin": "2026-11-04T03:44:51.982126+00:00"
+          }
+        ]
+      },
+      "productos_fabricados": [
+        "Pata"
+      ],
+      "fin_estimado": "2026-11-04T03:44:51.982126+00:00"
+    },
+    "SOL-3": {
+      "insumos": {
+        "Madera": 19
+      },
+      "desde_stock": {},
+      "a_fabricar": {
+        "Pata": 19
+      },
+      "orden_fabricacion": [
+        "Pata"
+      ],
+      "materiales": [
+        {},
+        {}
+      ],
+      "cantidad_a_fabricar": 19,
+      "programacion": {
+        "Pata": [
+          {
+            "inicio": "2026-11-04T03:44:51.982126+00:00",
+            "fin": "2026-11-04T08:29:51.982126+00:00"
+          }
+        ]
+      },
+      "productos_fabricados": [
+        "Pata"
+      ],
+      "fin_estimado": "2026-11-04T08:29:51.982126+00:00"
+    },
+    "SOL-4": {
+      "insumos": {
+        "Madera": 19
+      },
+      "desde_stock": {},
+      "a_fabricar": {
+        "Pata": 19
+      },
+      "orden_fabricacion": [
+        "Pata"
+      ],
+      "materiales": [
+        {},
+        {}
+      ],
+      "cantidad_a_fabricar": 19,
+      "programacion": {
+        "Pata": [
+          {
+            "inicio": "2026-11-04T08:29:51.982126+00:00",
+            "fin": "2026-11-04T13:14:51.982126+00:00"
+          }
+        ]
+      },
+      "productos_fabricados": [
+        "Pata"
+      ],
+      "fin_estimado": "2026-11-04T13:14:51.982126+00:00"
+    },
+    "SOL-5": {
+      "insumos": {
+        "Madera": 24,
+        "Tornillos": 32
+      },
+      "desde_stock": {},
+      "a_fabricar": {
+        "Mesa": 4,
+        "Pata": 16,
+        "Tabla": 4
+      },
+      "orden_fabricacion": [
+        "Pata",
+        "Tabla",
+        "Mesa"
+      ],
+      "materiales": [
+        {},
+        {}
+      ],
+      "cantidad_a_fabricar": 4,
+      "programacion": {
+        "Pata": [
+          {
+            "inicio": "2026-11-04T13:14:51.982126+00:00",
+            "fin": "2026-11-04T17:14:51.982126+00:00"
+          }
+        ],
+        "Tabla": [
+          {
+            "inicio": "2026-11-04T17:14:51.982126+00:00",
+            "fin": "2026-11-04T21:14:51.982126+00:00"
+          }
+        ],
+        "Mesa": [
+          {
+            "inicio": "2026-11-04T21:14:51.982126+00:00",
+            "fin": "2026-11-04T23:14:51.982126+00:00"
+          }
+        ]
+      },
+      "productos_fabricados": [
+        "Mesa",
+        "Pata",
+        "Tabla"
+      ],
+      "fin_estimado": "2026-11-04T23:14:51.982126+00:00"
+    }
+  }
 }

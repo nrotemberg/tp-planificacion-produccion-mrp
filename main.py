@@ -240,9 +240,33 @@ def crear_solicitud(sistema):
         print(f"Solicitud {identificador} creada.")
 
 
+def _mostrar_insumos_faltantes(sistema, solicitud):
+    """Muestra cuánto falta comprar de cada insumo requerido."""
+    plan = sistema.bom.calcular_plan(
+        solicitud.producto,
+        solicitud.cantidad,
+        sistema.inventario,
+    )
+    faltantes = []
+    for insumo, cantidad_requerida in plan["insumos"].items():
+        cantidad_disponible = sistema.inventario.stock_libre(insumo)
+        cantidad_faltante = max(cantidad_requerida - cantidad_disponible, 0)
+        if cantidad_faltante:
+            faltantes.append((insumo, cantidad_faltante))
+
+    if not faltantes:
+        return False
+
+    print("Insumos faltantes:")
+    for insumo, cantidad in faltantes:
+        print(f"- {insumo.nombre}: {cantidad} {insumo.unidad_medida}")
+    return True
+
+
 def _procesar_solicitud(sistema, solicitud):
     """Planifica, fabrica y finaliza una solicitud."""
     if solicitud.estado == "creada" and not sistema.procesar_siguiente_solicitud():
+        _mostrar_insumos_faltantes(sistema, solicitud)
         raise EstadoSolicitudError(
             f"No se pudo planificar '{solicitud.id}': "
             "faltan materiales o recursos disponibles"
