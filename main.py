@@ -175,7 +175,7 @@ def _seleccionar_elemento(elementos, mensaje):
 
 
 def agregar_stock(sistema):
-    """Agrega 100 unidades al stock de cada insumo."""
+    """Agrega al stock la cantidad elegida de un insumo."""
     insumos = [
         elemento
         for elemento in sistema.elementos_produccion.values()
@@ -185,9 +185,17 @@ def agregar_stock(sistema):
         print("No hay insumos para actualizar.")
         return
 
-    for insumo in insumos:
-        sistema.inventario.agregar_stock(insumo, 100)
-        print(f"Se agregaron 100 unidades a {insumo.nombre}.")
+    print("\nInsumos disponibles")
+    insumo = _seleccionar_elemento(insumos, "Número del insumo: ")
+    if insumo is None:
+        return
+
+    cantidad = _leer_entero_positivo("Cantidad a comprar: ")
+    if cantidad is None:
+        return
+
+    sistema.inventario.agregar_stock(insumo, cantidad)
+    print(f"Se agregaron {cantidad} unidades a {insumo.nombre}.")
 
 
 def _productos_fabricables(sistema):
@@ -316,7 +324,7 @@ def mostrar_menu():
         "1. Procesar siguiente solicitud (FIFO)\n"
         "2. Mostrar solicitudes\n"
         "3. Mostrar inventario\n"
-        "4. Agregar 100 unidades a cada insumo\n"
+        "4. Comprar insumo\n"
         "5. Crear solicitud\n"
         "6. Detectar cuellos de botella\n"
         "7. Mostrar historial de tareas\n"

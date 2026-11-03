@@ -2,7 +2,7 @@
   "version": 1,
   "inventario": {
     "Madera": {
-      "actual": 10,
+      "actual": 60,
       "reservado": 10
     },
     "Tornillos": {

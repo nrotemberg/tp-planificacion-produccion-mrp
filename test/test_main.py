@@ -175,6 +175,11 @@ def test_main_recorrido_interactivo_completo(tmp_path, monkeypatch, capsys):
     respuestas = iter(
         (
             "4",
+            "1",
+            "37",
+            "4",
+            "2",
+            "8",
             "5",
             "3",
             "1",
@@ -200,7 +205,8 @@ def test_main_recorrido_interactivo_completo(tmp_path, monkeypatch, capsys):
 
     salida = capsys.readouterr().out
     assert "Configuración cargada:" in salida
-    assert "Se agregaron 100 unidades a Madera." in salida
+    assert "Se agregaron 37 unidades a Madera." in salida
+    assert "Se agregaron 8 unidades a Tornillos." in salida
     assert "Solicitud SOL-1 creada." in salida
     assert "SOL-1: Mesa x 1 | creada | Presentación" in salida
     assert "Procesando SOL-1: Mesa x 1" in salida

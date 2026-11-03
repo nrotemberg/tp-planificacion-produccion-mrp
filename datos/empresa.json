@@ -69,6 +69,12 @@
       "nombre": "Ana",
       "costo_por_hora": 25,
       "habilidades": ["corte", "armado"]
+    },
+    {
+      "id": "jose",
+      "nombre": "Jose",
+      "costo_por_hora": 10,
+      "habilidades": ["corte"]
     }
   ],
   "unidades_trabajo": [
