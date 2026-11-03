@@ -618,23 +618,3 @@ def test_solicitud_no_se_quita_de_la_cola_si_no_puede_planificarse():
     assert sistema.fabricar_siguiente_producto(1) == (mesa, 2)
     assert sistema.finalizar_produccion(1) is True
     assert len(sistema.cola_solicitudes) == 0
-
-def test_guardar_y_cargar_pickle_preserva_el_sistema(tmp_path):
-    sistema, solicitud, madera, mesa = crear_sistema()
-    sistema.reservar_recursos(solicitud.id)
-
-    ruta = tmp_path / "sistema_mrp.pkl"
-    sistema.guardar_pickle(ruta)
-    sistema_recuperado = SistemaMRP.cargar_pickle(ruta)
-
-    assert isinstance(sistema_recuperado, SistemaMRP)
-    assert sistema_recuperado is not sistema
-    assert sistema_recuperado.elementos_produccion.keys() == sistema.elementos_produccion.keys()
-    assert sistema_recuperado.solicitudes[solicitud.id].estado == "planificada"
-    assert sistema_recuperado.inventario.stock[
-        sistema_recuperado.elementos_produccion[madera.nombre]
-    ]["reservado"] == 4
-    assert (
-        sistema_recuperado.solicitudes[solicitud.id].producto
-        is sistema_recuperado.elementos_produccion[mesa.nombre]
-    )

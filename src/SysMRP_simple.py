@@ -1,4 +1,3 @@
-import pickle
 from datetime import datetime, timedelta
 from src.clases_auxiliares import ColaFIFO
 from src.manufactura import Colaborador, UnidadTrabajo, PeriodoOperacion
@@ -25,18 +24,6 @@ class SistemaMRP:
         self._finalizaciones_estimadas = {}
         self._fabricaciones_realizadas = {}
         self._tareas_fabricacion = {}
-
-    def guardar_pickle(self, ruta):
-        with open(ruta, "wb") as archivo:
-            pickle.dump(self, archivo)
-
-    @classmethod
-    def cargar_pickle(cls, ruta):
-        with open(ruta, "rb") as archivo:
-            sistema = pickle.load(archivo)
-        if not isinstance(sistema, cls):
-            raise TypeError("El archivo no contiene un SistemaMRP")
-        return sistema
 
     def agregar_elemento(self, elemento, stock_actual=0, stock_reservado=0):
         if elemento.nombre in self.elementos_produccion:

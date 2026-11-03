@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from src.cargador_json import cargar_sistema_desde_json
-from src.persistencia_json import cargar_estado
+from src.persistencia_json import cargar_estado, guardar_estado
 from main import (
     _productos_fabricables,
     crear_solicitud,
@@ -48,18 +48,23 @@ def test_crear_solicitud_permite_elegir_un_subproducto(
     assert solicitud.inicio_planificacion is None
 
 
-def test_estado_inicial_no_carga_stock_de_ejemplo():
+def test_carga_stock_guardado_en_estado(tmp_path):
     sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
-    ruta_estado = RUTA_CONFIGURACION_EJEMPLO.with_name(
-        "empresa_estado.json"
-    )
-    assert cargar_estado(ruta_estado, sistema)
+    madera = sistema.elementos_produccion["Madera"]
+    tornillos = sistema.elementos_produccion["Tornillos"]
+    sistema.inventario.agregar_stock(madera, 17)
+    sistema.inventario.agregar_stock(tornillos, 23)
+    ruta_estado = tmp_path / "empresa_estado.json"
+    guardar_estado(ruta_estado, sistema)
 
-    for producto in sistema.elementos_produccion.values():
-        assert sistema.inventario.obtener_stock(producto) == {
-            "actual": 0,
-            "reservado": 0,
-        }
+    sistema_restaurado = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+    assert cargar_estado(ruta_estado, sistema_restaurado)
+    assert sistema_restaurado.inventario.obtener_stock(
+        sistema_restaurado.elementos_produccion["Madera"]
+    ) == {"actual": 17, "reservado": 0}
+    assert sistema_restaurado.inventario.obtener_stock(
+        sistema_restaurado.elementos_produccion["Tornillos"]
+    ) == {"actual": 23, "reservado": 0}
 
 
 def test_mostrar_cuellos_de_botella_imprime_las_unidades_mas_cargadas(
