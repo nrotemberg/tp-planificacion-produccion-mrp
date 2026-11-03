@@ -314,6 +314,27 @@ def test_no_finalizar_dos_veces_la_misma_solicitud():
     assert sistema.inventario.obtener_stock(mesa) == stock_mesa
     assert solicitud.estado == "finalizada"
 
+
+def test_solicitud_para_inventario_deja_producto_final_disponible():
+    sistema, solicitud, madera, mesa = crear_sistema()
+    solicitud.solicitante = "INVENTARIO"
+
+    assert sistema.reservar_recursos(1) is True
+    assert sistema.iniciar_produccion(1) is True
+    while sistema.fabricar_siguiente_producto(1) is not None:
+        pass
+
+    assert sistema.finalizar_produccion(1) is True
+    assert sistema.inventario.obtener_stock(mesa) == {
+        "actual": 2,
+        "reservado": 0,
+    }
+    assert sistema.inventario.obtener_stock(madera) == {
+        "actual": 6,
+        "reservado": 0,
+    }
+
+
 def test_bom_anidada_reserva_el_stock_de_los_insumos():
     madera = Insumo("Madera", "unidad", 5)
     base = Producto("Base", "unidad", 1)

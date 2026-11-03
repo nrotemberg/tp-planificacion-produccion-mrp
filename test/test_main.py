@@ -1,6 +1,10 @@
 from pathlib import Path
 
+import pytest
+
 from src.cargador_json import cargar_sistema_desde_json
+from src.elementos import Insumo
+from src.excepciones import RecursosInsuficientesError
 from src.persistencia_json import cargar_estado, guardar_estado
 from main import (
     _productos_fabricables,
@@ -48,6 +52,19 @@ def test_crear_solicitud_permite_elegir_un_subproducto(
     assert solicitud.inicio_planificacion is None
 
 
+def test_no_crea_solicitud_si_cantidad_supera_capacidad_de_ut(
+    monkeypatch,
+):
+    sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+    respuestas = iter(("3", "12", ""))
+    monkeypatch.setattr("builtins.input", lambda _: next(respuestas))
+
+    with pytest.raises(RecursosInsuficientesError, match="capacidad máxima"):
+        crear_solicitud(sistema)
+
+    assert sistema.solicitudes == {}
+
+
 def test_carga_stock_guardado_en_estado(tmp_path):
     sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
     madera = sistema.elementos_produccion["Madera"]
@@ -77,6 +94,31 @@ def test_mostrar_cuellos_de_botella_imprime_las_unidades_mas_cargadas(
     salida = capsys.readouterr().out
     assert "Cuellos de botella" in salida
     assert "No hay unidades de trabajo ocupadas." in salida
+
+
+def test_cuellos_de_botella_acumula_horas_fabricadas_por_ut():
+    sistema = cargar_sistema_desde_json(RUTA_CONFIGURACION_EJEMPLO)
+    for elemento in sistema.elementos_produccion.values():
+        if isinstance(elemento, Insumo):
+            sistema.inventario.agregar_stock(elemento, 100)
+
+    assert sistema.crear_orden_fabricacion(
+        "SOL-1",
+        sistema.elementos_produccion["Mesa"],
+        1,
+    )
+    assert sistema.procesar_siguiente_solicitud()
+    assert sistema.detectar_cuello() == []
+
+    sistema.iniciar_produccion("SOL-1")
+    while sistema.fabricar_siguiente_producto("SOL-1") is not None:
+        pass
+
+    carga_por_unidad = {
+        carga["unidad"].nombre: carga["horas_ocupadas"]
+        for carga in sistema.detectar_cuello()
+    }
+    assert carga_por_unidad == {"Sierra": 2, "Banco de ensamblaje": 0.5}
 
 
 def test_mostrar_historial_tareas_informa_si_no_hay_tareas_en_la_sesion(

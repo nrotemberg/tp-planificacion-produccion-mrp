@@ -1,13 +1,19 @@
 from datetime import datetime, timedelta
 from src.clases_auxiliares import ColaFIFO
 from src.manufactura import Colaborador, UnidadTrabajo, PeriodoOperacion
-from src.excepciones import EstadoSolicitudError, TipoInvalidoError
+from src.excepciones import (
+    EstadoSolicitudError,
+    RecursosInsuficientesError,
+    TipoInvalidoError,
+)
 from src.bom import GestorBOM
 from src.inventario import Inventario
 from src.solicitudes import Solicitud
 
 
 class SistemaMRP:
+    SOLICITANTE_INVENTARIO = "inventario"
+
     def __init__(self):
         self.elementos_produccion = {}
         self.colaboradores = []
@@ -24,6 +30,7 @@ class SistemaMRP:
         self._finalizaciones_estimadas = {}
         self._fabricaciones_realizadas = {}
         self._tareas_fabricacion = {}
+        self._horas_ocupadas_por_unidad = {}
 
     def agregar_elemento(self, elemento, stock_actual=0, stock_reservado=0):
         if elemento.nombre in self.elementos_produccion:
@@ -40,9 +47,32 @@ class SistemaMRP:
     def crear_solicitud(self, solicitud):
         if self.obtener_solicitud_por_id(solicitud.id) is not None:
             return False
+        self._validar_capacidad_solicitud(solicitud.producto, solicitud.cantidad)
         self.solicitudes[solicitud.id] = solicitud
         self.cola_solicitudes.encolar(solicitud.id)
         return True
+
+    def _validar_capacidad_solicitud(self, producto, cantidad):
+        plan = self.bom.calcular_plan(producto, cantidad, self.inventario)
+        for producto_a_fabricar, cantidad_a_fabricar in plan[
+            "a_fabricar"
+        ].items():
+            proceso = producto_a_fabricar.proceso_manufactura
+            if proceso is None:
+                continue
+            for tarea in proceso.tareas:
+                unidad = tarea.unidad_trabajo
+                if (
+                    unidad is not None
+                    and cantidad_a_fabricar > unidad.capacidad_max_produccion
+                ):
+                    raise RecursosInsuficientesError(
+                        f"No se puede crear la solicitud: "
+                        f"{cantidad_a_fabricar} unidades de "
+                        f"{producto_a_fabricar.nombre} superan la capacidad "
+                        f"máxima ({unidad.capacidad_max_produccion}) "
+                        f"de {unidad.nombre}"
+                    )
 
     def obtener_solicitud_por_id(self, id_solicitud):
         return self.solicitudes.get(id_solicitud)
@@ -183,6 +213,14 @@ class SistemaMRP:
             tarea.actualizar_estado("en_curso")
             tarea.finalizar()
 
+        for tarea, periodo in zip(proceso.tareas, periodos):
+            unidad = tarea.unidad_trabajo
+            if unidad is not None:
+                self._horas_ocupadas_por_unidad[unidad] = (
+                    self._horas_ocupadas_por_unidad.get(unidad, 0)
+                    + periodo.duracion_horas()
+                )
+
         # Transformar los componentes en el producto fabricado.
         self.inventario.consumir(requerimientos)
         self.inventario.agregar_stock(producto, cantidad)
@@ -250,9 +288,18 @@ class SistemaMRP:
                 "No hay suficientes productos reservados para entregar"
             )
 
-        self.inventario.consumir(
-            {producto: solicitud.cantidad}
-        )
+        if (
+            isinstance(solicitud.solicitante, str)
+            and solicitud.solicitante.strip().casefold()
+            == self.SOLICITANTE_INVENTARIO
+        ):
+            self.inventario.liberar_reserva(
+                {producto: solicitud.cantidad}
+            )
+        else:
+            self.inventario.consumir(
+                {producto: solicitud.cantidad}
+            )
 
         solicitud.cambiar_estado()
         self.planes_materiales.pop(id_solicitud)
@@ -306,25 +353,19 @@ class SistemaMRP:
         return self.consumir_stock(id_solicitud)
 
     def detectar_cuello(self):
-        """Devuelve hasta tres unidades ordenadas por horas ocupadas.
-
-        Cada resultado contiene la unidad y la suma de las duraciones de sus
-        períodos ocupados. Las unidades sin períodos ocupados no se incluyen.
-        """
-        unidades_con_carga = []
-
+        """Devuelve hasta tres unidades ordenadas por horas acumuladas."""
+        horas_por_unidad = dict(self._horas_ocupadas_por_unidad)
         for unidad in self.unidades_trabajo:
-            horas_ocupadas = sum(
+            horas_por_unidad[unidad] = horas_por_unidad.get(unidad, 0) + sum(
                 periodo.duracion_horas()
                 for periodo in unidad.periodos_ocupados
             )
-            if horas_ocupadas > 0:
-                unidades_con_carga.append(
-                    {
-                        "unidad": unidad,
-                        "horas_ocupadas": horas_ocupadas,
-                    }
-                )
+
+        unidades_con_carga = [
+            {"unidad": unidad, "horas_ocupadas": horas}
+            for unidad, horas in horas_por_unidad.items()
+            if horas > 0
+        ]
 
         unidades_con_carga.sort(
             key=lambda carga: carga["horas_ocupadas"],

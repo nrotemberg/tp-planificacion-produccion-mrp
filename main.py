@@ -18,7 +18,8 @@ def mostrar_solicitudes(sistema):
     for solicitud in sistema.solicitudes.values():
         print(
             f"- {solicitud.id}: {solicitud.producto.nombre} "
-            f"x {solicitud.cantidad} | {solicitud.estado}"
+            f"x {solicitud.cantidad} | {solicitud.estado} | {solicitud.solicitante}"
+
         )
 
 
@@ -36,7 +37,7 @@ def mostrar_inventario(sistema):
 
 
 def mostrar_cuellos_de_botella(sistema):
-    """Imprime las unidades de trabajo con mayor carga acumulada."""
+    """Imprime las unidades de trabajo con más horas acumuladas en la sesión."""
     cuellos = sistema.detectar_cuello()
 
     print("\nCuellos de botella")
@@ -48,7 +49,7 @@ def mostrar_cuellos_de_botella(sistema):
         unidad = carga["unidad"]
         print(
             f"{posicion}. {unidad.nombre}: "
-            f"{carga['horas_ocupadas']} horas ocupadas"
+            f"{carga['horas_ocupadas']} horas acumuladas"
         )
 
 
@@ -275,7 +276,14 @@ def _procesar_solicitud(sistema, solicitud):
             f"No se pudo finalizar la solicitud '{solicitud.id}'"
         )
 
-    print(f"Estado: {solicitud.estado} (pedido entregado)")
+    if (
+        isinstance(solicitud.solicitante, str)
+        and solicitud.solicitante.strip().casefold()
+        == sistema.SOLICITANTE_INVENTARIO
+    ):
+        print(f"Estado: {solicitud.estado} (stock agregado al inventario)")
+    else:
+        print(f"Estado: {solicitud.estado} (pedido entregado a {solicitud.solicitante})")
     costo_unitario = solicitud.producto.costo_unitario()
     costo_fabricacion = sistema.calcular_costo_fabricacion(solicitud.id)
     print(f"Costo estándar de fabricación nueva: ${costo_fabricacion:.2f}")

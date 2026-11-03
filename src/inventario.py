@@ -64,6 +64,17 @@ class Inventario:
             datos["actual"] -= cantidad
             datos["reservado"] -= cantidad
 
+    def liberar_reserva(self, requerimientos):
+        """Libera reservas sin retirar las unidades del inventario."""
+        items = self._validar_requerimientos(requerimientos)
+        for elemento, cantidad in items:
+            if self.obtener_stock(elemento)["reservado"] < cantidad:
+                raise StockInsuficienteError(
+                    f"No hay stock reservado suficiente de '{elemento.nombre}'"
+                )
+        for elemento, cantidad in items:
+            self.obtener_stock(elemento)["reservado"] -= cantidad
+
     def agregar_stock(self, elemento, cantidad):
         self._validar_cantidad(cantidad, "La cantidad a agregar")
         self.obtener_stock(elemento)["actual"] += cantidad
