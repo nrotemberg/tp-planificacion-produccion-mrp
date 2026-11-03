@@ -65,6 +65,44 @@ Para usar otro archivo de configuración, se busca el estado junto a él con el
 mismo nombre base y el sufijo `_estado.json`. Las solicitudes se crean desde
 el menú y no se cargan en la configuración fija.
 
+## Ejecución
+
+Desde la raíz del proyecto, se inicia el sistema con:
+
+```bash
+python main.py
+```
+
+Opcionalmente, se puede indicar otro archivo de configuración JSON versión 3:
+
+```bash
+python main.py ruta/a/empresa.json
+```
+
+El archivo de estado se crea junto a la configuración indicada, con el mismo
+nombre base y el sufijo `_estado.json`. El menú permite:
+
+| Opción | Acción |
+|---|---|
+| 1 | Procesar la siguiente solicitud de la cola FIFO, de principio a fin. |
+| 2 | Consultar las solicitudes y sus estados. |
+| 3 | Consultar stock actual, reservado y libre. |
+| 4 | Agregar 100 unidades de cada insumo. |
+| 5 | Crear una solicitud para un producto fabricable. |
+| 6 | Consultar las unidades de trabajo más ocupadas. |
+| 7 | Consultar el historial de tareas de la sesión. |
+| 8 | Consultar las tareas definidas en la configuración. |
+| 9 | Consultar las unidades de trabajo configuradas. |
+| 10 | Consultar los colaboradores configurados. |
+| 11 | Guardar el estado y salir. |
+
+Para ejecutar los tests automatizados:
+
+```bash
+python -m pytest
+```
+
+
 
 ## Reglas de Negocio Clave
 

@@ -265,9 +265,9 @@ def _procesar_solicitud(sistema, solicitud):
 
     while True:
         resultado = sistema.fabricar_siguiente_producto(solicitud.id)
-        sleep(5)  #aca valoramos mucho el realismo
         if resultado is None:
             break
+        sleep(5)  # aca valoramos mucho el realismo
         producto, cantidad_fabricada = resultado
         print(f"Fabricado: {producto.nombre} | Cantidad: {cantidad_fabricada}")
 
